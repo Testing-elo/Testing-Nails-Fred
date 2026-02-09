@@ -1,0 +1,7 @@
+{
+  "name": "Copy of NailzByFred Site Testing",
+  "description": "An elegant and modern portfolio and booking site for professional Nail Artist nailzbyfred.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}

@@ -1,0 +1,177 @@
+
+export type Language = 'en' | 'fr';
+
+export const translations = {
+  en: {
+    nav: {
+      home: 'Home',
+      services: 'Services',
+      portfolio: 'Portfolio',
+      bookNow: 'Book Now',
+      availabilities: 'Availabilities',
+    },
+    hero: {
+      title: 'Beauty at your',
+      subtitle: 'Fingertips',
+      badge: 'Professional Nail Artist',
+      description: 'NailzByFred offers premium nail care and custom artistry. Where every set is a masterpiece.',
+      ctaBook: 'Book Your Session',
+      ctaGallery: 'View Portfolio',
+    },
+    services: {
+      title: 'Our Services',
+      description: 'From essential maintenance to luxury extensions, we provide a full range of high-end nail services.',
+      note: '* Prices may vary based on length and complexity of nail art.',
+    },
+    gallery: {
+      title: 'The Portfolio',
+      subtitle: 'Recent work by @nailzbyfred',
+      adminAccess: 'Owner Access',
+      addTitle: 'Add a Masterpiece',
+      adminLogin: 'Owner Login',
+      enterPass: 'Enter your private access code',
+      unlock: 'Unlock Management',
+      wrongPass: 'Incorrect Access Code',
+      categories: {
+        all: 'All',
+        classic: 'Classic',
+        acrylic: 'Acrylic',
+        art: 'Art',
+      },
+    },
+    booking: {
+      badge: 'Reservation',
+      title: 'Ready for your',
+      titleHighlight: 'Transformation?',
+      description: 'Secure your spot with Fred. We recommend booking at least 1 week in advance for peak times.',
+      location: 'Studio Location',
+      contact: 'Contact Email',
+      inspiration: 'Inspiration Photo',
+      inspirationDesc: 'Upload a reference photo of the design you want (Optional)',
+      uploadBtn: 'Upload Photo',
+      changePhoto: 'Change Photo',
+      labels: {
+        name: 'Your Name',
+        email: 'Email Address',
+        phone: 'Phone Number',
+        contactMethod: 'Preferred Contact Method',
+        contactOptions: {
+          email: 'Email Only',
+          phone: 'Phone Number Only',
+          both: 'Both Email & Phone'
+        },
+        service: 'Select Service',
+        length: 'Base Length',
+        addons: 'Add-ons',
+        addonType: 'Add-on Type',
+        amount: 'Qty',
+        addAddon: '+ Add Customization',
+        date: 'Preferred Date',
+      },
+      button: 'Request Appointment',
+      processing: 'Processing...',
+      success: 'Appointment request received! Fred will confirm via your preferred contact method shortly.',
+      policy: 'By booking, you agree to our 24h cancellation policy',
+      thankYou: {
+        title: 'Thank You!',
+        subtitle: 'Your request has been sent',
+        message: 'Fred will review your request and reach out via your preferred contact method within 24 hours to finalize your appointment time.',
+        returnBtn: 'Return to Home',
+        summaryTitle: 'Appointment Details',
+      }
+    },
+    footer: {
+      about: 'Elevating the art of the manicure. Located in the heart of the city, bringing your nail dreams to life with precision and style.',
+      connect: 'Connect',
+      hours: 'Hours',
+      schedule: 'Mon - Sat: 9am - 7pm',
+      closed: 'Sun: Closed',
+    }
+  },
+  fr: {
+    nav: {
+      home: 'Accueil',
+      services: 'Services',
+      portfolio: 'Portfolio',
+      bookNow: 'Réserver',
+      availabilities: 'Disponibilités',
+    },
+    hero: {
+      title: 'La beauté au bout',
+      subtitle: 'des doigts',
+      badge: 'Artiste Ongulaire Professionnel',
+      description: 'NailzByFred propose des soins des ongles haut de gamme et des créations personnalisées. Chaque pose est un chef-d’œuvre.',
+      ctaBook: 'Réserver votre séance',
+      ctaGallery: 'Voir le Portfolio',
+    },
+    services: {
+      title: 'Nos Services',
+      description: 'De l’entretien essentiel aux extensions de luxe, nous offrons une gamme complète de services de haute qualité.',
+      note: '* Les prix peuvent varier selon la longueur et la complexité du design.',
+    },
+    gallery: {
+      title: 'Le Portfolio',
+      subtitle: 'Travaux récents par @nailzbyfred',
+      adminAccess: 'Accès Propriétaire',
+      addTitle: 'Ajouter une Création',
+      adminLogin: 'Connexion Propriétaire',
+      enterPass: 'Entrez votre code d\'accès privé',
+      unlock: 'Déverrouiller la Gestion',
+      wrongPass: 'Code d\'accès incorrect',
+      categories: {
+        all: 'Tout',
+        classic: 'Classique',
+        acrylic: 'Acrylique',
+        art: 'Art',
+      },
+    },
+    booking: {
+      badge: 'Réservation',
+      title: 'Prête pour votre',
+      titleHighlight: 'Transformation ?',
+      description: 'Réservez votre créneau avec Fred. Nous recommandons de réserver au moins une semaine à l’avance.',
+      location: 'Emplacement du Studio',
+      contact: 'E-mail de Contact',
+      inspiration: 'Photo d\'Inspiration',
+      inspirationDesc: 'Téléchargez une photo de référence du design souhaité (Optionnel)',
+      uploadBtn: 'Télécharger une photo',
+      changePhoto: 'Changer la photo',
+      labels: {
+        name: 'Votre Nom',
+        email: 'Adresse E-mail',
+        phone: 'Numéro de téléphone',
+        contactMethod: 'Mode de contact préféré',
+        contactOptions: {
+          email: 'E-mail uniquement',
+          phone: 'Téléphone uniquement',
+          both: 'E-mail et Téléphone'
+        },
+        service: 'Choisir un Service',
+        length: 'Longueur de Base',
+        addons: 'Options / Add-ons',
+        addonType: 'Type d\'Option',
+        amount: 'Qté',
+        addAddon: '+ Ajouter une Personnalisation',
+        date: 'Date souhaitée',
+      },
+      button: 'Demander un rendez-vous',
+      processing: 'Traitement...',
+      success: 'Demande de rendez-vous reçue ! Fred confirmera via votre mode de contact préféré sous peu.',
+      policy: 'En réservant, vous acceptez notre politique d’annulation de 24h',
+      thankYou: {
+        title: 'Merci !',
+        subtitle: 'Votre demande a été envoyée',
+        message: 'Fred examinera votre demande et vous contactera par votre moyen de contact préféré sous 24 heures pour finaliser l\'heure de votre rendez-vous.',
+        returnBtn: 'Retour à l\'accueil',
+        summaryTitle: 'Détails du rendez-vous',
+      }
+    },
+    footer: {
+      about: 'L’art de la manucure sublimé. Situé au cœur de la ville, nous donnons vie à vos rêves d’ongles avec précision et style.',
+      connect: 'Réseaux',
+      hours: 'Horaires',
+      schedule: 'Lun - Sam : 9h - 19h',
+      closed: 'Dimanche : Fermé',
+    }
+  }
+};

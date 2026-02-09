@@ -1,0 +1,83 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>NailzByFred | Professional Nail Artistry</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --brand-pink: #FFC0CB; /* Light pink from logo */
+      --brand-deep: #3D1D24; /* A soft, rich deep plum/espresso instead of black */
+      --brand-white: #FFFFFF;
+    }
+    body {
+      font-family: 'Inter', sans-serif;
+      background-color: var(--brand-white);
+      color: var(--brand-deep);
+    }
+    h1, h2, h3, .serif {
+      font-family: 'Playfair Display', serif;
+    }
+    .bg-brand-pink { background-color: var(--brand-pink); }
+    .text-brand-pink { color: var(--brand-pink); }
+    .border-brand-pink { border-color: var(--brand-pink); }
+    
+    .bg-brand-deep { background-color: var(--brand-deep); }
+    .text-brand-deep { color: var(--brand-deep); }
+    .border-brand-deep { border-color: var(--brand-deep); }
+    
+    /* Utility overrides for the old black colors */
+    .text-black { color: var(--brand-deep); }
+    .bg-black { background-color: var(--brand-deep); }
+    .border-black { border-color: var(--brand-deep); }
+    .hover\:bg-black:hover { background-color: var(--brand-deep); }
+    .hover\:border-black:hover { border-color: var(--brand-deep); }
+    
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(8px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .animate-fade-in {
+      animation: fadeIn 0.3s ease-out forwards;
+    }
+
+    /* Bubbly/Girly button glow for booking */
+    .btn-book-glow {
+      box-shadow: 0 10px 25px -5px rgba(61, 29, 36, 0.25);
+      /* Transition only specific properties to prevent color shift on hover */
+      transition-property: transform, box-shadow;
+      transition-duration: 0.3s;
+      transition-timing-function: cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    }
+    .btn-book-glow:hover {
+      transform: scale(1.03);
+      box-shadow: 0 15px 30px -5px rgba(61, 29, 36, 0.4);
+    }
+
+    /* Custom scrollbar */
+    ::-webkit-scrollbar {
+      width: 6px;
+    }
+    ::-webkit-scrollbar-thumb {
+      background-color: var(--brand-deep);
+      border-radius: 10px;
+    }
+  </style>
+<script type="importmap">
+{
+  "imports": {
+    "react": "https://esm.sh/react@^19.2.4",
+    "react-dom/": "https://esm.sh/react-dom@^19.2.4/",
+    "react/": "https://esm.sh/react@^19.2.4/",
+    "@google/genai": "https://esm.sh/@google/genai@^1.38.0"
+  }
+}
+</script>
+</head>
+<body class="bg-white text-gray-900">
+  <div id="root"></div>
+</body>
+</html>
