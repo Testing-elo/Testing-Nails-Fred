@@ -106,8 +106,37 @@ const Booking: React.FC<BookingProps> = ({ onBack, initialDate, initialTime }) =
     return true;
   };
 
-  const nextStep = () => isStepValid() && (step === 4 ? setShowSuccess(true) : setStep(s => s + 1));
-  const prevStep = () => setStep(s => Math.max(s - 1, 1));
+ const nextStep = async () => {
+  if (!isStepValid()) return;
+  
+  if (step === 4) {
+    // Send booking data to N8N webhook
+    try {
+      await fetch('https://webhook.site/a475c29a-08ff-46b2-9e6f-950f728998b5', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          customerName: formState.name,
+          contactMethod: formState.contactMethod,
+          contactDetail: formState.contactDetail,
+          service: totals.baseName,
+          addons: totals.items,
+          date: selectedDate?.toLocaleDateString(),
+          time: selectedTime,
+          estimatedTotal: totals.price,
+          timestamp: new Date().toISOString()
+        })
+      });
+    } catch (error) {
+      console.error('Failed to send booking:', error);
+    }
+    
+    setShowSuccess(true);
+  } else {
+    setStep(s => s + 1);
+  }
+};
+const prevStep = () => setStep(s => Math.max(s - 1, 1));
 
   const toggleAddon = (id: string) => {
     setSelectedAddons(prev => ({
