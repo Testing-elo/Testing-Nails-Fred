@@ -86,12 +86,15 @@ const AvailabilityView: React.FC<AvailabilityViewProps> = ({ onBookNow }) => {
                   onClick={() => { setSelectedDate(date); setSelectedTime(null); }}
                   className={`aspect-square flex flex-col items-center justify-center rounded-3xl text-sm font-black transition-all relative ${
                     isSelected ? 'bg-brand-pink text-brand-deep shadow-2xl scale-110' : 
-                    !isAvailable || isPast ? 'text-gray-100 opacity-20 cursor-not-allowed' : 
+                    isPast ? 'bg-gray-100/40 text-gray-200 opacity-40 cursor-not-allowed' :
+                    !isAvailable ? 'bg-gray-50/50 text-gray-300 opacity-60 cursor-not-allowed' : 
                     'bg-gray-50 text-brand-deep hover:bg-brand-pink/20 hover:scale-105'
                   }`}
                 >
-                  {date.getDate()}
+                  <span className={isPast ? 'line-through' : ''}>{date.getDate()}</span>
+                  {isPast && <span className="absolute bottom-2 text-[6px] uppercase tracking-tighter opacity-50 font-black">Past</span>}
                   {isAvailable && !isPast && !isSelected && <span className="absolute bottom-2 text-[6px] text-brand-pink animate-pulse">✦</span>}
+                  {!isAvailable && !isPast && <span className="absolute bottom-2 text-[5px] uppercase tracking-widest opacity-40 font-black">N/A</span>}
                 </button>
               );
             })}

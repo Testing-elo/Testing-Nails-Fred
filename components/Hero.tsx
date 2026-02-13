@@ -24,7 +24,7 @@ const Hero: React.FC<HeroProps> = ({ onBookClick, onPortfolioClick }) => {
         <span className="inline-block text-brand-deep font-bold tracking-[0.5em] uppercase mb-4 md:mb-6 animate-fade-in border-b-2 border-brand-deep pb-2 text-[9px] md:text-[10px]">
           {t.hero.badge}
         </span>
-        <h1 className="text-4xl sm:text-5xl md:text-9xl text-brand-deep font-bold serif mb-6 md:mb-8 tracking-tighter leading-[0.9] md:leading-[0.85]">
+        <h1 className="text-4xl sm:text-5xl md:text-8xl lg:text-9xl text-brand-deep font-bold serif mb-6 md:mb-8 tracking-tight leading-tight md:leading-[1.1]">
           {t.hero.title} <br/> 
           <span className="italic relative drop-shadow-sm">
             {t.hero.subtitle}

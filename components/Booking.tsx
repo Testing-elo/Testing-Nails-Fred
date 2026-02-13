@@ -59,13 +59,13 @@ const Booking: React.FC<BookingProps> = ({ onBack, initialDate, initialTime }) =
     return days;
   }, [currentMonth]);
 
-  const activeTimes = useMemo(() => {
+  const timeSlotsForDate = useMemo(() => {
     if (!selectedDate) return [];
     const rawTimes = availabilities.times[selectedDate.toDateString()] || [];
-    // Filter out already booked slots
-    return rawTimes.filter(time => 
-      !bookings.some(b => b.date === selectedDate.toDateString() && b.time === time)
-    );
+    return rawTimes.map(time => ({
+      time,
+      isBooked: bookings.some(b => b.date === selectedDate.toDateString() && b.time === time)
+    }));
   }, [selectedDate, availabilities, bookings]);
 
   const totals = useMemo(() => {
@@ -269,25 +269,46 @@ const Booking: React.FC<BookingProps> = ({ onBack, initialDate, initialTime }) =
                     const dateStr = date.toDateString();
                     const isAvailable = availabilities.dates.includes(dateStr);
                     const isSelected = selectedDate?.toDateString() === dateStr;
+                    const isPast = date < new Date(new Date().setHours(0,0,0,0));
+                    
                     return (
                       <button 
                         key={idx} 
-                        disabled={!isAvailable} 
+                        disabled={!isAvailable || isPast} 
                         onClick={() => { setSelectedDate(date); setSelectedTime(null); }}
-                        className={`aspect-square flex items-center justify-center rounded-2xl text-[10px] md:text-xs font-black transition-all ${isSelected ? 'bg-brand-pink text-brand-deep shadow-lg scale-110 z-10' : !isAvailable ? 'text-gray-100 opacity-20 cursor-not-allowed' : 'bg-gray-50 text-brand-deep hover:bg-brand-pink/20'}`}
+                        className={`aspect-square flex flex-col items-center justify-center rounded-2xl text-[10px] md:text-xs font-black transition-all relative ${
+                          isSelected ? 'bg-brand-pink text-brand-deep shadow-lg scale-110 z-10' : 
+                          isPast ? 'bg-gray-100/50 text-gray-300 opacity-40 cursor-not-allowed' :
+                          !isAvailable ? 'bg-gray-50/50 text-gray-300 opacity-60 cursor-not-allowed' : 
+                          'bg-gray-50 text-brand-deep hover:bg-brand-pink/20'
+                        }`}
                       >
-                        {date.getDate()}
+                        <span className={isPast ? 'line-through' : ''}>{date.getDate()}</span>
+                        {isPast && <span className="absolute bottom-1 text-[6px] uppercase tracking-tighter opacity-50">Past</span>}
+                        {!isAvailable && !isPast && <span className="absolute bottom-1 text-[5px] uppercase tracking-widest opacity-40">N/A</span>}
                       </button>
                     );
                   })}
                 </div>
                 {selectedDate && (
                   <div className="animate-fade-in">
-                    {activeTimes.length > 0 ? (
+                    {timeSlotsForDate.length > 0 ? (
                       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 md:gap-4">
-                        {activeTimes.map(slot => (
-                          <button key={slot} onClick={() => setSelectedTime(slot)} className={`py-4 rounded-2xl text-[10px] font-black transition-all border-2 ${selectedTime === slot ? 'bg-brand-deep text-white border-brand-deep shadow-xl scale-105' : 'bg-gray-50 text-brand-deep border-transparent hover:border-brand-pink'}`}>
-                            {slot}
+                        {timeSlotsForDate.map(slot => (
+                          <button 
+                            key={slot.time} 
+                            disabled={slot.isBooked}
+                            onClick={() => setSelectedTime(slot.time)} 
+                            className={`py-4 rounded-2xl text-[10px] font-black transition-all border-2 relative overflow-hidden ${
+                              slot.isBooked 
+                              ? 'bg-gray-50 text-gray-300 cursor-not-allowed opacity-60' 
+                              : selectedTime === slot.time 
+                                ? 'bg-brand-deep text-white border-brand-deep shadow-xl scale-105' 
+                                : 'bg-gray-50 text-brand-deep border-transparent hover:border-brand-pink'
+                            }`}
+                          >
+                            <span className={slot.isBooked ? 'line-through' : ''}>{slot.time}</span>
+                            {slot.isBooked && <span className="absolute inset-0 flex items-center justify-center bg-gray-100/30 text-[8px] uppercase font-black text-gray-400">Booked</span>}
                           </button>
                         ))}
                       </div>
