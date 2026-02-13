@@ -16,10 +16,14 @@ const Booking: React.FC<BookingProps> = ({ onBack, initialDate, initialTime }) =
   
   // Real Availabilities from Admin
   const [availabilities, setAvailabilities] = useState<{ dates: string[], times: Record<string, string[]> }>({ dates: [], times: {} });
+  const [bookings, setBookings] = useState<{ date: string, time: string }[]>([]);
 
   useEffect(() => {
-    const saved = localStorage.getItem('nailzbyfred_availabilities');
-    if (saved) setAvailabilities(JSON.parse(saved));
+    const savedAvail = localStorage.getItem('nailzbyfred_availabilities');
+    if (savedAvail) setAvailabilities(JSON.parse(savedAvail));
+    
+    const savedBookings = localStorage.getItem('nailzbyfred_bookings');
+    if (savedBookings) setBookings(JSON.parse(savedBookings));
   }, []);
 
   // Calendar State
@@ -57,8 +61,12 @@ const Booking: React.FC<BookingProps> = ({ onBack, initialDate, initialTime }) =
 
   const activeTimes = useMemo(() => {
     if (!selectedDate) return [];
-    return availabilities.times[selectedDate.toDateString()] || [];
-  }, [selectedDate, availabilities]);
+    const rawTimes = availabilities.times[selectedDate.toDateString()] || [];
+    // Filter out already booked slots
+    return rawTimes.filter(time => 
+      !bookings.some(b => b.date === selectedDate.toDateString() && b.time === time)
+    );
+  }, [selectedDate, availabilities, bookings]);
 
   const totals = useMemo(() => {
     const base = SIZINGS.find(s => s.id === formState.lengthId);
@@ -96,8 +104,6 @@ const Booking: React.FC<BookingProps> = ({ onBack, initialDate, initialTime }) =
       const isNameValid = formState.name.trim() !== '';
       const isMethodValid = formState.contactMethod !== '';
       const isDetailValid = formState.contactDetail.trim() !== '';
-      
-      // If phone, check for complete format (14 characters total: (XXX)-XXX-XXXX)
       if (formState.contactMethod === 'phone') {
          return isNameValid && isMethodValid && formState.contactDetail.length === 14;
       }
@@ -106,37 +112,28 @@ const Booking: React.FC<BookingProps> = ({ onBack, initialDate, initialTime }) =
     return true;
   };
 
- const nextStep = async () => {
-  if (!isStepValid()) return;
-  
-  if (step === 4) {
-    // Send booking data to N8N webhook
-    try {
-      await fetch('https://testingweb.app.n8n.cloud/webhook-test/72f548be-e447-443a-a4af-0920318bcd20', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          customerName: formState.name,
-          contactMethod: formState.contactMethod,
-          contactDetail: formState.contactDetail,
-          service: totals.baseName,
-          addons: totals.items,
-          date: selectedDate?.toLocaleDateString(),
-          time: selectedTime,
-          estimatedTotal: totals.price,
-          timestamp: new Date().toISOString()
-        })
-      });
-    } catch (error) {
-      console.error('Failed to send booking:', error);
-    }
-    
+  const handleFinalSubmit = () => {
+    if (!selectedDate || !selectedTime) return;
+
+    // Save Booking
+    const newBooking = { date: selectedDate.toDateString(), time: selectedTime };
+    const updatedBookings = [...bookings, newBooking];
+    setBookings(updatedBookings);
+    localStorage.setItem('nailzbyfred_bookings', JSON.stringify(updatedBookings));
+
     setShowSuccess(true);
-  } else {
-    setStep(s => s + 1);
-  }
-};
-const prevStep = () => setStep(s => Math.max(s - 1, 1));
+  };
+
+  const nextStep = () => {
+    if (!isStepValid()) return;
+    if (step === 4) {
+      handleFinalSubmit();
+    } else {
+      setStep(s => s + 1);
+    }
+  };
+
+  const prevStep = () => setStep(s => Math.max(s - 1, 1));
 
   const toggleAddon = (id: string) => {
     setSelectedAddons(prev => ({
@@ -232,35 +229,21 @@ const prevStep = () => setStep(s => Math.max(s - 1, 1));
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 md:gap-6">
                   {ADDONS.map((addon) => {
                     const qty = selectedAddons[addon.id] || 0;
-                    // ft: French tips, od: Other designs, bn: Bling nails, cg: Charms, 3d: 3D
                     const isMulti = ['ft', 'od', 'bn', 'cg', '3d'].includes(addon.id);
-                    
                     return (
                       <div key={addon.id} className={`p-6 md:p-8 rounded-[2rem] border-2 transition-all flex items-center justify-between ${qty > 0 ? 'bg-brand-pink/5 border-brand-pink shadow-md' : 'bg-gray-50 border-transparent hover:border-gray-100'}`}>
                         <div className="flex-grow">
                           <h4 className="font-bold text-brand-deep text-sm md:text-base mb-1">{language === 'fr' ? addon.nameFr : addon.name}</h4>
                           <p className="text-[10px] text-gray-400 uppercase tracking-widest font-black">{addon.price}</p>
                         </div>
-                        
                         {isMulti ? (
                           <div className="flex items-center bg-white rounded-full shadow-sm border border-gray-100 overflow-hidden ml-4">
-                            <button 
-                              onClick={(e) => { e.stopPropagation(); updateAddonQty(addon.id, -1); }} 
-                              className="w-10 h-10 flex items-center justify-center text-brand-deep hover:bg-brand-pink/20 transition-colors font-bold text-lg"
-                            >-</button>
+                            <button onClick={(e) => { e.stopPropagation(); updateAddonQty(addon.id, -1); }} className="w-10 h-10 flex items-center justify-center text-brand-deep hover:bg-brand-pink/20 transition-colors font-bold text-lg">-</button>
                             <span className="w-8 text-center text-xs font-black">{qty}</span>
-                            <button 
-                              onClick={(e) => { e.stopPropagation(); updateAddonQty(addon.id, 1); }} 
-                              className="w-10 h-10 flex items-center justify-center text-brand-deep hover:bg-brand-pink/20 transition-colors font-bold text-lg"
-                            >+</button>
+                            <button onClick={(e) => { e.stopPropagation(); updateAddonQty(addon.id, 1); }} className="w-10 h-10 flex items-center justify-center text-brand-deep hover:bg-brand-pink/20 transition-colors font-bold text-lg">+</button>
                           </div>
                         ) : (
-                          <button 
-                            onClick={() => toggleAddon(addon.id)}
-                            className={`w-10 h-10 rounded-full flex items-center justify-center transition-all ${qty > 0 ? 'bg-brand-deep text-white shadow-lg' : 'bg-white text-gray-200 border border-gray-100'}`}
-                          >
-                            {qty > 0 ? '✓' : '+'}
-                          </button>
+                          <button onClick={() => toggleAddon(addon.id)} className={`w-10 h-10 rounded-full flex items-center justify-center transition-all ${qty > 0 ? 'bg-brand-deep text-white shadow-lg' : 'bg-white text-gray-200 border border-gray-100'}`}>{qty > 0 ? '✓' : '+'}</button>
                         )}
                       </div>
                     );
@@ -309,7 +292,7 @@ const prevStep = () => setStep(s => Math.max(s - 1, 1));
                         ))}
                       </div>
                     ) : (
-                      <div className="text-center py-8 text-gray-300 italic text-xs border-2 border-dashed border-gray-100 rounded-3xl">No times available for this date.</div>
+                      <div className="text-center py-8 text-gray-300 italic text-xs border-2 border-dashed border-gray-100 rounded-3xl">All slots booked or unavailable.</div>
                     )}
                   </div>
                 )}
@@ -323,26 +306,14 @@ const prevStep = () => setStep(s => Math.max(s - 1, 1));
                 <div className="space-y-10">
                   <div className="space-y-4">
                     <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 block ml-6">Full Name</label>
-                    <input 
-                      type="text" 
-                      className="w-full p-8 bg-gray-50 border-2 border-transparent rounded-[2.5rem] outline-none focus:border-brand-deep focus:bg-white text-lg font-medium transition-all" 
-                      value={formState.name} 
-                      onChange={(e) => setFormState({...formState, name: e.target.value})} 
-                      placeholder="e.g. Jane Doe" 
-                    />
+                    <input type="text" className="w-full p-8 bg-gray-50 border-2 border-transparent rounded-[2.5rem] outline-none focus:border-brand-deep focus:bg-white text-lg font-medium transition-all" value={formState.name} onChange={(e) => setFormState({...formState, name: e.target.value})} placeholder="e.g. Jane Doe" />
                   </div>
                   
                   <div className="space-y-4">
                     <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 block ml-6">How should Fred reach you?</label>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       {['email', 'phone'].map(method => (
-                        <button 
-                          key={method} 
-                          onClick={() => setFormState({...formState, contactMethod: method, contactDetail: ''})} 
-                          className={`py-6 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all border-2 ${formState.contactMethod === method ? 'bg-brand-deep text-white border-brand-deep shadow-lg' : 'bg-white text-gray-400 border-gray-50 hover:border-brand-pink'}`}
-                        >
-                          {method}
-                        </button>
+                        <button key={method} onClick={() => setFormState({...formState, contactMethod: method, contactDetail: ''})} className={`py-6 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all border-2 ${formState.contactMethod === method ? 'bg-brand-deep text-white border-brand-deep shadow-lg' : 'bg-white text-gray-400 border-gray-50 hover:border-brand-pink'}`}>{method}</button>
                       ))}
                     </div>
                   </div>
@@ -350,13 +321,7 @@ const prevStep = () => setStep(s => Math.max(s - 1, 1));
                   {formState.contactMethod && (
                      <div className="animate-fade-in space-y-4">
                         <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 block ml-6">Your {formState.contactMethod} detail</label>
-                        <input 
-                          type="text" 
-                          className="w-full p-8 bg-gray-50 border-2 border-transparent rounded-[2.5rem] outline-none focus:border-brand-deep focus:bg-white text-lg font-medium transition-all" 
-                          placeholder={formState.contactMethod === 'phone' ? '(514)-123-4567' : `Enter your ${formState.contactMethod}...`} 
-                          value={formState.contactDetail}
-                          onChange={handleContactDetailChange}
-                        />
+                        <input type="text" className="w-full p-8 bg-gray-50 border-2 border-transparent rounded-[2.5rem] outline-none focus:border-brand-deep focus:bg-white text-lg font-medium transition-all" placeholder={formState.contactMethod === 'phone' ? '(514)-123-4567' : `Enter your ${formState.contactMethod}...`} value={formState.contactDetail} onChange={handleContactDetailChange} />
                      </div>
                   )}
                 </div>
@@ -365,27 +330,16 @@ const prevStep = () => setStep(s => Math.max(s - 1, 1));
 
             <div className="flex justify-between items-center pt-12">
               {step > 1 ? (
-                <button onClick={prevStep} className="px-10 py-5 text-gray-400 font-black uppercase tracking-[0.4em] text-[10px] flex items-center hover:text-brand-deep transition-all">
-                  <span className="mr-3">←</span> Back
-                </button>
+                <button onClick={prevStep} className="px-10 py-5 text-gray-400 font-black uppercase tracking-[0.4em] text-[10px] flex items-center hover:text-brand-deep transition-all"><span className="mr-3">←</span> Back</button>
               ) : <div />}
               
-              <button 
-                onClick={nextStep} 
-                disabled={!isStepValid()} 
-                className={`px-14 py-6 bg-brand-deep text-white rounded-full font-black uppercase tracking-[0.4em] text-[10px] shadow-2xl transition-all ${!isStepValid() ? 'opacity-20 cursor-not-allowed translate-y-2' : 'hover:scale-105 active:scale-95'}`}
-              >
-                {step === 4 ? 'Send Request ✦' : 'Next Step'}
-              </button>
+              <button onClick={nextStep} disabled={!isStepValid()} className={`px-14 py-6 bg-brand-deep text-white rounded-full font-black uppercase tracking-[0.4em] text-[10px] shadow-2xl transition-all ${!isStepValid() ? 'opacity-20 cursor-not-allowed translate-y-2' : 'hover:scale-105 active:scale-95'}`}>{step === 4 ? 'Send Request ✦' : 'Next Step'}</button>
             </div>
           </div>
 
-          {/* Sticky Summary Sidebar */}
           <div className="lg:col-span-4 lg:sticky lg:top-32 h-fit">
             <div className="bg-white p-10 md:p-12 rounded-[3.5rem] md:rounded-[4rem] shadow-2xl border-4 border-[#FFC0CB]/30 relative overflow-hidden">
-               <div className="absolute top-0 right-0 p-8 opacity-10 text-4xl">✦</div>
                <h3 className="text-2xl font-bold serif mb-10 text-brand-deep border-b border-gray-50 pb-6">Summary</h3>
-               
                <div className="space-y-6">
                  <div className="flex justify-between items-start">
                     <div>
@@ -394,35 +348,21 @@ const prevStep = () => setStep(s => Math.max(s - 1, 1));
                     </div>
                     <span className="text-brand-deep font-black text-xs">{SIZINGS.find(s => s.id === formState.lengthId)?.price}</span>
                  </div>
-
                  {totals.items.length > 0 && (
                     <div className="space-y-4 pt-2">
                        <span className="text-gray-400 uppercase tracking-widest text-[8px] font-black block">Custom Add-ons</span>
                        {totals.items.map((item, i) => (
-                         <div key={i} className="flex justify-between items-center text-[10px] animate-fade-in">
-                            <span className="text-gray-500 font-medium">{item.name}</span>
-                            <span className="text-brand-deep font-bold">{item.price}</span>
-                         </div>
+                         <div key={i} className="flex justify-between items-center text-[10px] animate-fade-in"><span className="text-gray-500 font-medium">{item.name}</span><span className="text-brand-deep font-bold">{item.price}</span></div>
                        ))}
                     </div>
                  )}
-
                  {selectedDate && (
                    <div className="pt-6 border-t border-gray-50 animate-fade-in">
                       <span className="text-gray-400 uppercase tracking-widest text-[8px] font-black block mb-2">Requested Slot</span>
-                      <div className="bg-brand-pink/10 p-4 rounded-2xl flex items-center justify-between">
-                         <span className="text-brand-deep font-black text-[9px]">{selectedDate.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}</span>
-                         <span className="text-brand-deep font-black text-[10px]">{selectedTime || '...'}</span>
-                      </div>
+                      <div className="bg-brand-pink/10 p-4 rounded-2xl flex items-center justify-between"><span className="text-brand-deep font-black text-[9px]">{selectedDate.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}</span><span className="text-brand-deep font-black text-[10px]">{selectedTime || '...'}</span></div>
                    </div>
                  )}
-
-                 <div className="pt-8 mt-4 border-t-2 border-brand-deep/5 flex justify-between items-center">
-                    <span className="text-gray-400 uppercase tracking-widest text-[10px] font-black">Est. Total</span>
-                    <span className="text-4xl font-bold italic serif text-brand-deep leading-none">${totals.price}</span>
-                 </div>
-                 
-                 <p className="text-[8px] text-gray-300 font-medium text-center uppercase tracking-widest pt-4">Final price confirmed by Fred</p>
+                 <div className="pt-8 mt-4 border-t-2 border-brand-deep/5 flex justify-between items-center"><span className="text-gray-400 uppercase tracking-widest text-[10px] font-black">Est. Total</span><span className="text-4xl font-bold italic serif text-brand-deep leading-none">${totals.price}</span></div>
                </div>
             </div>
           </div>

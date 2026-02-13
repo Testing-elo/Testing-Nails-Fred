@@ -12,14 +12,16 @@ const AvailabilityView: React.FC<AvailabilityViewProps> = ({ onBookNow }) => {
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [selectedTime, setSelectedTime] = useState<string | null>(null);
   
-  // Real Availabilities from Admin
+  // Real Availabilities and Bookings
   const [availabilities, setAvailabilities] = useState<{ dates: string[], times: Record<string, string[]> }>({ dates: [], times: {} });
+  const [bookings, setBookings] = useState<{ date: string, time: string }[]>([]);
 
   useEffect(() => {
-    const saved = localStorage.getItem('nailzbyfred_availabilities');
-    if (saved) {
-      setAvailabilities(JSON.parse(saved));
-    }
+    const savedAvail = localStorage.getItem('nailzbyfred_availabilities');
+    if (savedAvail) setAvailabilities(JSON.parse(savedAvail));
+
+    const savedBookings = localStorage.getItem('nailzbyfred_bookings');
+    if (savedBookings) setBookings(JSON.parse(savedBookings));
   }, []);
 
   const calendarDays = useMemo(() => {
@@ -35,8 +37,12 @@ const AvailabilityView: React.FC<AvailabilityViewProps> = ({ onBookNow }) => {
 
   const activeTimes = useMemo(() => {
     if (!selectedDate) return [];
-    return availabilities.times[selectedDate.toDateString()] || [];
-  }, [selectedDate, availabilities]);
+    const times = availabilities.times[selectedDate.toDateString()] || [];
+    return times.map(slot => ({
+      time: slot,
+      isBooked: bookings.some(b => b.date === selectedDate.toDateString() && b.time === slot)
+    }));
+  }, [selectedDate, availabilities, bookings]);
 
   return (
     <section className="py-20 md:py-32 bg-white relative">
@@ -45,7 +51,7 @@ const AvailabilityView: React.FC<AvailabilityViewProps> = ({ onBookNow }) => {
           <span className="inline-block text-brand-pink font-black text-[10px] uppercase tracking-[0.5em] mb-4">✦ Availability ✦</span>
           <h2 className="text-4xl md:text-6xl font-bold serif text-brand-deep mb-6">Check Openings</h2>
           <p className="text-gray-400 font-medium max-w-lg mx-auto text-sm leading-relaxed italic">
-            "No dates selected" means the schedule is currently closed. Keep an eye out for newly opened spots!
+            Slots marked as booked are currently unavailable. Find an open spot to begin your transformation!
           </p>
         </div>
 
@@ -97,11 +103,19 @@ const AvailabilityView: React.FC<AvailabilityViewProps> = ({ onBookNow }) => {
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
                 {activeTimes.map(slot => (
                   <button
-                    key={slot}
-                    onClick={() => setSelectedTime(slot)}
-                    className={`py-4 rounded-2xl text-[10px] font-black transition-all ${selectedTime === slot ? 'bg-brand-deep text-white shadow-xl scale-105' : 'bg-[#FFC0CB]/5 text-brand-deep hover:bg-white border-2 border-transparent hover:border-brand-pink'}`}
+                    key={slot.time}
+                    disabled={slot.isBooked}
+                    onClick={() => setSelectedTime(slot.time)}
+                    className={`py-4 rounded-2xl text-[10px] font-black transition-all relative overflow-hidden ${
+                      slot.isBooked 
+                      ? 'bg-gray-50 text-gray-300 cursor-not-allowed opacity-60' 
+                      : selectedTime === slot.time 
+                        ? 'bg-brand-deep text-white shadow-xl scale-105' 
+                        : 'bg-[#FFC0CB]/5 text-brand-deep hover:bg-white border-2 border-transparent hover:border-brand-pink'
+                    }`}
                   >
-                    {slot}
+                    <span className={slot.isBooked ? 'line-through' : ''}>{slot.time}</span>
+                    {slot.isBooked && <span className="absolute inset-0 flex items-center justify-center bg-gray-100/40 text-[8px] uppercase tracking-widest text-gray-500 font-black">Booked</span>}
                   </button>
                 ))}
               </div>
@@ -115,7 +129,6 @@ const AvailabilityView: React.FC<AvailabilityViewProps> = ({ onBookNow }) => {
           )}
         </div>
 
-        {/* Pop-up Button */}
         <div className={`fixed bottom-12 left-1/2 -translate-x-1/2 z-50 transition-all duration-500 ease-out transform ${selectedDate && selectedTime ? 'translate-y-0 opacity-100' : 'translate-y-20 opacity-0 pointer-events-none'}`}>
           <button
             onClick={() => selectedDate && selectedTime && onBookNow(selectedDate, selectedTime)}
