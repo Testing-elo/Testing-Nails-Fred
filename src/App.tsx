@@ -56,7 +56,8 @@ const App: React.FC = () => {
         showNotification("Incorrect code.", 'error');
         setAdminCode('');
       }
-    } catch {
+  } catch (err) {
+      console.error('Admin login error:', err);
       showNotification("Something went wrong. Try again.", 'error');
     }
   };
