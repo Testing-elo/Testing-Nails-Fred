@@ -112,17 +112,38 @@ const Booking: React.FC<BookingProps> = ({ onBack, initialDate, initialTime }) =
     return true;
   };
 
-  const handleFinalSubmit = () => {
+const handleFinalSubmit = async () => {
     if (!selectedDate || !selectedTime) return;
 
-    // Save Booking
-    const newBooking = { date: selectedDate.toDateString(), time: selectedTime };
-    const updatedBookings = [...bookings, newBooking];
-    setBookings(updatedBookings);
-    localStorage.setItem('nailzbyfred_bookings', JSON.stringify(updatedBookings));
+// Send booking data to N8N webhook
+  try {
+    await fetch('https://testingweb.app.n8n.cloud/webhook-test/72f548be-e447-443a-a4af-0920318bcd20', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        customerName: formState.name,
+        contactMethod: formState.contactMethod,
+        contactDetail: formState.contactDetail,
+        service: totals.baseName,
+        addons: totals.items,
+        date: selectedDate?.toLocaleDateString(),
+        time: selectedTime,
+        estimatedTotal: totals.price,
+        timestamp: new Date().toISOString()
+      })
+    });
+  } catch (error) {
+    console.error('Failed to send booking:', error);
+  }
 
-    setShowSuccess(true);
-  };
+  // Save Booking locally
+  const newBooking = { date: selectedDate.toDateString(), time: selectedTime };
+  const updatedBookings = [...bookings, newBooking];
+  setBookings(updatedBookings);
+  localStorage.setItem('nailzbyfred_bookings', JSON.stringify(updatedBookings));
+
+  setShowSuccess(true);
+};
 
   const nextStep = () => {
     if (!isStepValid()) return;
