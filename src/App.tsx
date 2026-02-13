@@ -38,16 +38,26 @@ const App: React.FC = () => {
     setTimeout(() => setToast(null), 3000);
   };
 
-  const handleAdminSubmit = (e?: React.FormEvent) => {
+ const handleAdminSubmit = async (e?: React.FormEvent) => {
     e?.preventDefault();
-    if (adminCode === "6741") {
-      setIsAdmin(true);
-      setShowAdminModal(false);
-      setAdminCode('');
-      showNotification("Welcome back, Fred! Admin access granted.");
-    } else {
-      showNotification("Incorrect code.", 'error');
-      setAdminCode('');
+    try {
+      const response = await fetch('/api/verify-admin', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code: adminCode }),
+      });
+
+      if (response.ok) {
+        setIsAdmin(true);
+        setShowAdminModal(false);
+        setAdminCode('');
+        showNotification("Welcome back, Fred! Admin access granted.");
+      } else {
+        showNotification("Incorrect code.", 'error');
+        setAdminCode('');
+      }
+    } catch {
+      showNotification("Something went wrong. Try again.", 'error');
     }
   };
 
