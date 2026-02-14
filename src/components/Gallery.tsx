@@ -74,7 +74,6 @@ const handleUpload = async () => {
     setUploading(false);
     onNotify?.("Portfolio Masterpiece Added!");
   };
-  };
 
   const handleDeleteImage = async (id: string, url: string) => {
     if (!window.confirm("Delete this masterpiece?")) return;
