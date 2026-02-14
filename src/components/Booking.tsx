@@ -8,8 +8,8 @@ interface BookingProps {
   initialDate?: Date | null;
   initialTime?: string | null;
 }
-const [inspirationImage, setInspirationImage] = useState<string | null>(null);
 const Booking: React.FC<BookingProps> = ({ onBack, initialDate, initialTime }) => {
+  const [inspirationImage, setInspirationImage] = useState<string | null>(null);
   const { language, t } = useLanguage();
   const [step, setStep] = useState(1);
   const [showSuccess, setShowSuccess] = useState(false);
@@ -416,10 +416,12 @@ const handleFinalSubmit = async () => {
                         >✕</button>
                       </div>
                     )}
-                  </div>
+                 </div>
+                </div>
+              </div>
+            )}
 
             <div className="flex justify-between items-center pt-12">
-              {step > 1 ? (
                 <button onClick={prevStep} className="px-10 py-5 text-gray-400 font-black uppercase tracking-[0.4em] text-[10px] flex items-center hover:text-brand-deep transition-all"><span className="mr-3">←</span> Back</button>
               ) : <div />}
               
