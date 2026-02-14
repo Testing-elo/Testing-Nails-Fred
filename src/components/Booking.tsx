@@ -8,7 +8,7 @@ interface BookingProps {
   initialDate?: Date | null;
   initialTime?: string | null;
 }
-
+const [inspirationImage, setInspirationImage] = useState<string | null>(null);
 const Booking: React.FC<BookingProps> = ({ onBack, initialDate, initialTime }) => {
   const { language, t } = useLanguage();
   const [step, setStep] = useState(1);
@@ -125,7 +125,13 @@ useEffect(() => {
     }
     return true;
   };
-
+const handleInspirationUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const file = e.target.files?.[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onloadend = () => setInspirationImage(reader.result as string);
+  reader.readAsDataURL(file);
+};
 const handleFinalSubmit = async () => {
     if (!selectedDate || !selectedTime) return;
 
@@ -135,6 +141,7 @@ const handleFinalSubmit = async () => {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
+        inspirationImage: inspirationImage || null,
         customerName: formState.name,
         contactMethod: formState.contactMethod,
         contactDetail: formState.contactDetail,
@@ -384,15 +391,32 @@ const handleFinalSubmit = async () => {
                     </div>
                   </div>
 
-                  {formState.contactMethod && (
+                 {formState.contactMethod && (
                      <div className="animate-fade-in space-y-4">
                         <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 block ml-6">Your {formState.contactMethod} detail</label>
                         <input type="text" className="w-full p-8 bg-gray-50 border-2 border-transparent rounded-[2.5rem] outline-none focus:border-brand-deep focus:bg-white text-lg font-medium transition-all" placeholder={formState.contactMethod === 'phone' ? '(514)-123-4567' : `Enter your ${formState.contactMethod}...`} value={formState.contactDetail} onChange={handleContactDetailChange} />
                      </div>
                   )}
-                </div>
-              </div>
-            )}
+
+                  <div className="animate-fade-in space-y-4">
+                    <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 block ml-6">Inspiration Photo <span className="text-brand-pink">(Optional)</span></label>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={handleInspirationUpload}
+                      className="w-full p-8 bg-gray-50 border-2 border-transparent rounded-[2.5rem] outline-none focus:border-brand-deep focus:bg-white text-sm font-medium transition-all cursor-pointer"
+                    />
+                    {inspirationImage && (
+                      <div className="relative w-32 h-32 rounded-2xl overflow-hidden border-4 border-brand-pink shadow-lg">
+                        <img src={inspirationImage} alt="Inspiration" className="w-full h-full object-cover" />
+                        <button
+                          type="button"
+                          onClick={() => setInspirationImage(null)}
+                          className="absolute top-2 right-2 w-6 h-6 bg-red-500 text-white rounded-full text-xs flex items-center justify-center"
+                        >✕</button>
+                      </div>
+                    )}
+                  </div>
 
             <div className="flex justify-between items-center pt-12">
               {step > 1 ? (
