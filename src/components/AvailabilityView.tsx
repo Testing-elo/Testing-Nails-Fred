@@ -1,4 +1,4 @@
-
+import { supabase } from '../services/supabase';
 import React, { useState, useMemo, useEffect } from 'react';
 import { useLanguage } from '../LanguageContext';
 
@@ -16,12 +16,24 @@ const AvailabilityView: React.FC<AvailabilityViewProps> = ({ onBookNow }) => {
   const [availabilities, setAvailabilities] = useState<{ dates: string[], times: Record<string, string[]> }>({ dates: [], times: {} });
   const [bookings, setBookings] = useState<{ date: string, time: string }[]>([]);
 
-  useEffect(() => {
-    const savedAvail = localStorage.getItem('nailzbyfred_availabilities');
-    if (savedAvail) setAvailabilities(JSON.parse(savedAvail));
+ useEffect(() => {
+    const fetchData = async () => {
+      const { data: availData } = await supabase.from('availabilities').select('*');
+      if (availData) {
+        const times: Record<string, string[]> = {};
+        const dates: string[] = [];
+        availData.forEach((row: { date: string; time: string }) => {
+          if (!times[row.date]) { times[row.date] = []; dates.push(row.date); }
+          times[row.date].push(row.time);
+        });
+        setAvailabilities({ dates, times });
+      }
 
-    const savedBookings = localStorage.getItem('nailzbyfred_bookings');
-    if (savedBookings) setBookings(JSON.parse(savedBookings));
+      const { data: bookingData } = await supabase.from('bookings').select('date, time');
+      if (bookingData) setBookings(bookingData);
+    };
+
+    fetchData();
   }, []);
 
   const calendarDays = useMemo(() => {
