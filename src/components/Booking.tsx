@@ -1,4 +1,4 @@
-
+import { supabase } from '../services/supabase';
 import React, { useState, useMemo, useEffect } from 'react';
 import { SIZINGS, ADDONS } from '../constants';
 import { useLanguage } from '../LanguageContext';
@@ -136,11 +136,21 @@ const handleFinalSubmit = async () => {
     console.error('Failed to send booking:', error);
   }
 
-  // Save Booking locally
+// Save booking to Supabase
+  await supabase.from('bookings').insert({
+    date: selectedDate.toDateString(),
+    time: selectedTime,
+    customer_name: formState.name,
+    contact_method: formState.contactMethod,
+    contact_detail: formState.contactDetail,
+    service: totals.baseName,
+    addons: totals.items,
+    estimated_total: totals.price
+  });
+
   const newBooking = { date: selectedDate.toDateString(), time: selectedTime };
   const updatedBookings = [...bookings, newBooking];
   setBookings(updatedBookings);
-  localStorage.setItem('nailzbyfred_bookings', JSON.stringify(updatedBookings));
 
   setShowSuccess(true);
 };
