@@ -14,8 +14,10 @@ const Gallery: React.FC<GalleryProps> = ({ isAdmin = false, onNotify }) => {
   const { t, language } = useLanguage();
   const [images, setImages] = useState<GalleryImage[]>([]);
   const [activeFilter, setActiveFilter] = useState('All');
-  const [uploading, setUploading] = useState(false);
+ const [uploading, setUploading] = useState(false);
   const [newImage, setNewImage] = useState({ title: '', category: 'Art' });
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     const fetchImages = async () => {
@@ -30,20 +32,18 @@ const Gallery: React.FC<GalleryProps> = ({ isAdmin = false, onNotify }) => {
     return images.filter(img => img.category === activeFilter);
   }, [images, activeFilter]);
 
-  const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file || !newImage.title) {
-      onNotify?.("Please enter a title first", 'error');
+const handleUpload = async () => {
+    if (!selectedFile || !newImage.title) {
+      onNotify?.("Please enter a title and select a file", 'error');
       return;
     }
 
     setUploading(true);
 
-    // Upload file to Supabase Storage
-    const fileName = `${Date.now()}-${file.name}`;
+    const fileName = `${Date.now()}-${selectedFile.name}`;
     const { error: uploadError } = await supabase.storage
       .from('portfolio')
-      .upload(fileName, file);
+      .upload(fileName, selectedFile);
 
     if (uploadError) {
       onNotify?.("Error uploading image", 'error');
@@ -51,16 +51,12 @@ const Gallery: React.FC<GalleryProps> = ({ isAdmin = false, onNotify }) => {
       return;
     }
 
-    // Get the public URL
     const { data: urlData } = supabase.storage
       .from('portfolio')
       .getPublicUrl(fileName);
 
-    const publicUrl = urlData.publicUrl;
-
-    // Save to portfolio table
     const { data, error } = await supabase.from('portfolio').insert({
-      url: publicUrl,
+      url: urlData.publicUrl,
       title: newImage.title,
       category: newImage.category
     }).select().single();
@@ -71,10 +67,13 @@ const Gallery: React.FC<GalleryProps> = ({ isAdmin = false, onNotify }) => {
       return;
     }
 
-    setImages(prev => [{ id: data.id.toString(), url: publicUrl, title: data.title, category: data.category }, ...prev]);
+    setImages(prev => [{ id: data.id.toString(), url: urlData.publicUrl, title: data.title, category: data.category }, ...prev]);
     setNewImage({ title: '', category: 'Art' });
+    setSelectedFile(null);
+    if (fileInputRef.current) fileInputRef.current.value = '';
     setUploading(false);
     onNotify?.("Portfolio Masterpiece Added!");
+  };
   };
 
   const handleDeleteImage = async (id: string, url: string) => {
@@ -134,23 +133,24 @@ const Gallery: React.FC<GalleryProps> = ({ isAdmin = false, onNotify }) => {
                   {CATEGORIES.filter(c => c !== 'All').map(c => <option key={c} value={c}>{c}</option>)}
                 </select>
               </div>
-              <div className="md:col-span-1">
+             <div className="md:col-span-1">
                 <label className="block text-[10px] font-black uppercase tracking-widest text-gray-400 mb-2">Image File</label>
                 <input
                   type="file"
                   accept="image/*"
+                  ref={fileInputRef}
                   className="w-full p-4 bg-white rounded-2xl border-2 border-transparent focus:border-brand-pink outline-none text-xs font-bold shadow-sm cursor-pointer"
-                  onChange={handleUpload}
+                  onChange={e => setSelectedFile(e.target.files?.[0] || null)}
                   disabled={uploading}
                 />
               </div>
-              <div className="flex items-center justify-center p-4">
-                {uploading && (
-                  <div className="text-brand-pink font-black text-[10px] uppercase tracking-widest animate-pulse">
-                    Uploading...
-                  </div>
-                )}
-              </div>
+              <button
+                onClick={handleUpload}
+                disabled={uploading || !selectedFile || !newImage.title}
+                className="bg-brand-deep text-white p-4 rounded-2xl font-black uppercase text-[10px] tracking-widest hover:bg-brand-pink hover:text-brand-deep transition-all shadow-xl hover:scale-105 active:scale-95 disabled:opacity-30 disabled:cursor-not-allowed disabled:scale-100"
+              >
+                {uploading ? 'Uploading...' : 'Update Portfolio'}
+              </button>
             </div>
           </div>
         )}
