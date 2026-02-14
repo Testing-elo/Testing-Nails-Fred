@@ -1,7 +1,7 @@
-
 import React, { useState, useEffect, useMemo } from 'react';
 import { useLanguage } from '../LanguageContext';
 import { GalleryImage } from '../types';
+import { supabase } from '../services/supabase';
 
 const CATEGORIES = ['All', 'Classic', 'Acrylic', 'Art', 'Gel', 'Luxury'];
 
@@ -14,15 +14,15 @@ const Gallery: React.FC<GalleryProps> = ({ isAdmin = false, onNotify }) => {
   const { t, language } = useLanguage();
   const [images, setImages] = useState<GalleryImage[]>([]);
   const [activeFilter, setActiveFilter] = useState('All');
-  
-  // Admin Form State
-  const [newImage, setNewImage] = useState({ url: '', title: '', category: 'Art' });
+  const [uploading, setUploading] = useState(false);
+  const [newImage, setNewImage] = useState({ title: '', category: 'Art' });
 
   useEffect(() => {
-    const savedImages = localStorage.getItem('nailzbyfred_gallery');
-    if (savedImages) {
-      setImages(JSON.parse(savedImages));
-    }
+    const fetchImages = async () => {
+      const { data } = await supabase.from('portfolio').select('*').order('created_at', { ascending: false });
+      if (data) setImages(data.map((row: any) => ({ id: row.id.toString(), url: row.url, title: row.title, category: row.category })));
+    };
+    fetchImages();
   }, []);
 
   const filteredImages = useMemo(() => {
@@ -30,30 +30,66 @@ const Gallery: React.FC<GalleryProps> = ({ isAdmin = false, onNotify }) => {
     return images.filter(img => img.category === activeFilter);
   }, [images, activeFilter]);
 
-  const handleAddImage = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newImage.url || !newImage.title) {
-      onNotify?.("Missing information", 'error');
+  const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !newImage.title) {
+      onNotify?.("Please enter a title first", 'error');
       return;
     }
-    
-    const imageToAdd: GalleryImage = {
-      id: Date.now().toString(),
-      ...newImage
-    };
-    
-    const updated = [imageToAdd, ...images];
-    setImages(updated);
-    localStorage.setItem('nailzbyfred_gallery', JSON.stringify(updated));
-    setNewImage({ url: '', title: '', category: 'Art' });
+
+    setUploading(true);
+
+    // Upload file to Supabase Storage
+    const fileName = `${Date.now()}-${file.name}`;
+    const { error: uploadError } = await supabase.storage
+      .from('portfolio')
+      .upload(fileName, file);
+
+    if (uploadError) {
+      onNotify?.("Error uploading image", 'error');
+      setUploading(false);
+      return;
+    }
+
+    // Get the public URL
+    const { data: urlData } = supabase.storage
+      .from('portfolio')
+      .getPublicUrl(fileName);
+
+    const publicUrl = urlData.publicUrl;
+
+    // Save to portfolio table
+    const { data, error } = await supabase.from('portfolio').insert({
+      url: publicUrl,
+      title: newImage.title,
+      category: newImage.category
+    }).select().single();
+
+    if (error) {
+      onNotify?.("Error saving image", 'error');
+      setUploading(false);
+      return;
+    }
+
+    setImages(prev => [{ id: data.id.toString(), url: publicUrl, title: data.title, category: data.category }, ...prev]);
+    setNewImage({ title: '', category: 'Art' });
+    setUploading(false);
     onNotify?.("Portfolio Masterpiece Added!");
   };
 
-  const handleDeleteImage = (id: string) => {
+  const handleDeleteImage = async (id: string, url: string) => {
     if (!window.confirm("Delete this masterpiece?")) return;
-    const updated = images.filter(img => img.id !== id);
-    setImages(updated);
-    localStorage.setItem('nailzbyfred_gallery', JSON.stringify(updated));
+
+    // Extract filename from URL to delete from storage
+    const fileName = url.split('/').pop();
+    if (fileName) {
+      await supabase.storage.from('portfolio').remove([fileName]);
+    }
+
+    const { error } = await supabase.from('portfolio').delete().eq('id', id);
+    if (error) { onNotify?.("Error deleting image", 'error'); return; }
+
+    setImages(prev => prev.filter(img => img.id !== id));
     onNotify?.("Image removed from portfolio");
   };
 
@@ -77,21 +113,11 @@ const Gallery: React.FC<GalleryProps> = ({ isAdmin = false, onNotify }) => {
             <h3 className="text-2xl font-bold serif text-brand-deep mb-8 flex items-center gap-4">
               <span className="text-brand-pink">✦</span> Add New Portfolio Item
             </h3>
-            <form onSubmit={handleAddImage} className="grid grid-cols-1 md:grid-cols-4 gap-6 items-end">
-              <div className="md:col-span-1">
-                <label className="block text-[10px] font-black uppercase tracking-widest text-gray-400 mb-2">Image URL</label>
-                <input 
-                  type="text" 
-                  className="w-full p-4 bg-white rounded-2xl border-2 border-transparent focus:border-brand-pink outline-none text-xs font-bold shadow-sm"
-                  placeholder="https://..."
-                  value={newImage.url}
-                  onChange={e => setNewImage({...newImage, url: e.target.value})}
-                />
-              </div>
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-6 items-end">
               <div className="md:col-span-1">
                 <label className="block text-[10px] font-black uppercase tracking-widest text-gray-400 mb-2">Title</label>
-                <input 
-                  type="text" 
+                <input
+                  type="text"
                   className="w-full p-4 bg-white rounded-2xl border-2 border-transparent focus:border-brand-pink outline-none text-xs font-bold shadow-sm"
                   placeholder="Glow Set"
                   value={newImage.title}
@@ -100,7 +126,7 @@ const Gallery: React.FC<GalleryProps> = ({ isAdmin = false, onNotify }) => {
               </div>
               <div className="md:col-span-1">
                 <label className="block text-[10px] font-black uppercase tracking-widest text-gray-400 mb-2">Category</label>
-                <select 
+                <select
                   className="w-full p-4 bg-white rounded-2xl border-2 border-transparent focus:border-brand-pink outline-none text-xs font-bold appearance-none shadow-sm cursor-pointer"
                   value={newImage.category}
                   onChange={e => setNewImage({...newImage, category: e.target.value})}
@@ -108,10 +134,24 @@ const Gallery: React.FC<GalleryProps> = ({ isAdmin = false, onNotify }) => {
                   {CATEGORIES.filter(c => c !== 'All').map(c => <option key={c} value={c}>{c}</option>)}
                 </select>
               </div>
-              <button type="submit" className="bg-brand-deep text-white p-4 rounded-2xl font-black uppercase text-[10px] tracking-widest hover:bg-brand-pink hover:text-brand-deep transition-all shadow-xl hover:scale-105 active:scale-95">
-                Update Portfolio
-              </button>
-            </form>
+              <div className="md:col-span-1">
+                <label className="block text-[10px] font-black uppercase tracking-widest text-gray-400 mb-2">Image File</label>
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="w-full p-4 bg-white rounded-2xl border-2 border-transparent focus:border-brand-pink outline-none text-xs font-bold shadow-sm cursor-pointer"
+                  onChange={handleUpload}
+                  disabled={uploading}
+                />
+              </div>
+              <div className="flex items-center justify-center p-4">
+                {uploading && (
+                  <div className="text-brand-pink font-black text-[10px] uppercase tracking-widest animate-pulse">
+                    Uploading...
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
         )}
 
@@ -122,8 +162,8 @@ const Gallery: React.FC<GalleryProps> = ({ isAdmin = false, onNotify }) => {
               key={cat}
               onClick={() => setActiveFilter(cat)}
               className={`px-6 py-2.5 md:px-8 md:py-3 rounded-2xl text-[9px] md:text-[10px] font-black uppercase tracking-[0.1em] md:tracking-[0.2em] transition-all duration-300 border-2 ${
-                activeFilter === cat 
-                ? 'bg-brand-deep border-brand-deep text-white shadow-xl scale-105 md:scale-110' 
+                activeFilter === cat
+                ? 'bg-brand-deep border-brand-deep text-white shadow-xl scale-105 md:scale-110'
                 : 'bg-white border-gray-50 text-gray-300 hover:border-brand-pink hover:text-brand-pink'
               }`}
             >
@@ -135,20 +175,20 @@ const Gallery: React.FC<GalleryProps> = ({ isAdmin = false, onNotify }) => {
         {filteredImages.length > 0 ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8 md:gap-12">
             {filteredImages.map((img) => (
-              <div 
-                key={img.id} 
+              <div
+                key={img.id}
                 className="group relative bg-white rounded-[2.5rem] md:rounded-[3.5rem] overflow-hidden shadow-lg hover:shadow-2xl transition-all duration-700 border-4 border-white animate-fade-in"
               >
                 <div className="aspect-[4/5] overflow-hidden bg-gray-50 relative">
-                  <img 
-                    src={img.url} 
-                    alt={img.title} 
+                  <img
+                    src={img.url}
+                    alt={img.title}
                     loading="lazy"
                     className="w-full h-full object-cover transition-transform duration-1000 group-hover:scale-110"
                   />
                   {isAdmin && (
-                    <button 
-                      onClick={() => handleDeleteImage(img.id)}
+                    <button
+                      onClick={() => handleDeleteImage(img.id, img.url)}
                       className="absolute top-6 right-6 w-10 h-10 bg-red-500 text-white rounded-full flex items-center justify-center shadow-lg opacity-0 group-hover:opacity-100 transition-opacity z-10"
                     >
                       <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
@@ -169,7 +209,7 @@ const Gallery: React.FC<GalleryProps> = ({ isAdmin = false, onNotify }) => {
         ) : (
           <div className="text-center py-20 md:py-32 bg-gray-50 rounded-[3rem] md:rounded-[5rem] border-4 border-dashed border-gray-100">
             <div className="w-16 h-16 md:w-20 md:h-20 bg-white rounded-full flex items-center justify-center mx-auto mb-6 md:mb-8 text-gray-200 shadow-sm">
-               <svg className="w-8 h-8 md:w-10 md:h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
+              <svg className="w-8 h-8 md:w-10 md:h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
             </div>
             <p className="text-gray-400 font-bold text-base md:text-lg mb-2">Portfolio is currently empty.</p>
             <p className="text-brand-pink font-black text-[9px] md:text-[10px] uppercase tracking-[0.4em]">✦ Awaiting Fred's Masterpieces ✦</p>
