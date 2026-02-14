@@ -421,7 +421,8 @@ const handleFinalSubmit = async () => {
               </div>
             )}
 
-            <div className="flex justify-between items-center pt-12">
+           <div className="flex justify-between items-center pt-12">
+              {step > 1 ? (
                 <button onClick={prevStep} className="px-10 py-5 text-gray-400 font-black uppercase tracking-[0.4em] text-[10px] flex items-center hover:text-brand-deep transition-all"><span className="mr-3">←</span> Back</button>
               ) : <div />}
               
