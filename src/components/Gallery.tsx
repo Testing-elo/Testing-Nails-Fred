@@ -148,7 +148,7 @@ const handleUpload = async () => {
                 disabled={uploading || !selectedFile || !newImage.title}
                 className="bg-brand-deep text-white p-4 rounded-2xl font-black uppercase text-[10px] tracking-widest hover:bg-brand-pink hover:text-brand-deep transition-all shadow-xl hover:scale-105 active:scale-95 disabled:opacity-30 disabled:cursor-not-allowed disabled:scale-100"
               >
-                {uploading ? 'Uploading...' : 'Update Portfolio'}
+                {uploading ? 'Uploading...' : 'Add to Portfolio'}
               </button>
             </div>
           </div>
