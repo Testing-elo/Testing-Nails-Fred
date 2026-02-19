@@ -135,6 +135,24 @@ const AdminAvailabilities: React.FC<AdminAvailabilitiesProps> = ({ onNotify }) =
     setCustomTimeNum(val.replace(/[^0-9:]/g, ''));
   };
 
+  const deleteBooking = async (dateStr: string, time: string) => {
+    if (!window.confirm("Remove this booking?")) return;
+
+    const { error } = await supabase
+      .from('bookings')
+      .delete()
+      .eq('date', dateStr)
+      .eq('time', time);
+
+    if (error) { onNotify('Error removing booking'); return; }
+
+    setBookings(prev => ({
+      ...prev,
+      [dateStr]: (prev[dateStr] || []).filter(b => b.time !== time)
+    }));
+    onNotify("Booking removed");
+  };
+
   const activeDateBookings = activeDate ? (bookings[activeDate] || []) : [];
 
   return (
@@ -233,10 +251,18 @@ const AdminAvailabilities: React.FC<AdminAvailabilitiesProps> = ({ onNotify }) =
                           return parse(a.time) - parse(b.time);
                         })
                         .map((booking, i) => (
-                          <div key={i} className="p-5 bg-brand-deep/5 rounded-3xl border border-brand-deep/10 animate-fade-in">
+                          <div key={i} className="p-5 bg-brand-deep/5 rounded-3xl border border-brand-deep/10 animate-fade-in group/card">
                             <div className="flex justify-between items-center mb-3">
-                              <span className="text-[10px] font-black text-brand-deep bg-brand-deep text-white px-3 py-1 rounded-full">{booking.time}</span>
-                              <span className="text-[10px] font-black text-brand-pink">${booking.estimated_total}</span>
+                              <span className="text-[10px] font-black bg-brand-deep text-white px-3 py-1 rounded-full">{booking.time}</span>
+                              <div className="flex items-center gap-3">
+                                <span className="text-[10px] font-black text-brand-pink">${booking.estimated_total}</span>
+                                <button
+                                  onClick={() => deleteBooking(activeDate!, booking.time)}
+                                  className="w-7 h-7 bg-red-100 text-red-400 rounded-full flex items-center justify-center hover:bg-red-500 hover:text-white transition-all opacity-0 group-hover/card:opacity-100"
+                                >
+                                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M6 18L18 6M6 6l12 12"></path></svg>
+                                </button>
+                              </div>
                             </div>
                             <p className="text-sm font-bold text-brand-deep mb-1">{booking.customer_name}</p>
                             <p className="text-[10px] text-gray-400 font-medium mb-1 italic">{booking.service}</p>
