@@ -3,7 +3,7 @@ import { useLanguage } from '../LanguageContext';
 import { GalleryImage } from '../types';
 import { supabase } from '../services/supabase';
 
-const CATEGORIES = ['All', 'Classic', 'Acrylic', 'Art', 'Gel', 'Luxury'];
+const DEFAULT_CATEGORIES = ['All', 'Classic', 'Acrylic', 'Art', 'Gel', 'Luxury'];
 
 interface GalleryProps {
   isAdmin?: boolean;
@@ -14,10 +14,15 @@ const Gallery: React.FC<GalleryProps> = ({ isAdmin = false, onNotify }) => {
   const { t, language } = useLanguage();
   const [images, setImages] = useState<GalleryImage[]>([]);
   const [activeFilter, setActiveFilter] = useState('All');
- const [uploading, setUploading] = useState(false);
+  const [uploading, setUploading] = useState(false);
   const [newImage, setNewImage] = useState({ title: '', category: 'Art' });
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
+
+  // Admin category management state
+  const [categories, setCategories] = useState<string[]>(DEFAULT_CATEGORIES);
+  const [showCatManager, setShowCatManager] = useState(false);
+  const [newCatName, setNewCatName] = useState('');
 
   useEffect(() => {
     const fetchImages = async () => {
@@ -25,14 +30,42 @@ const Gallery: React.FC<GalleryProps> = ({ isAdmin = false, onNotify }) => {
       if (data) setImages(data.map((row: any) => ({ id: row.id.toString(), url: row.url, title: row.title, category: row.category })));
     };
     fetchImages();
+
+    // Load saved categories from localStorage
+    const saved = localStorage.getItem('portfolio_categories');
+    if (saved) {
+      try { setCategories(JSON.parse(saved)); } catch {}
+    }
   }, []);
+
+  const saveCategories = (cats: string[]) => {
+    setCategories(cats);
+    localStorage.setItem('portfolio_categories', JSON.stringify(cats));
+  };
+
+  const handleAddCategory = () => {
+    const trimmed = newCatName.trim();
+    if (!trimmed || categories.includes(trimmed)) return;
+    const updated = [...categories, trimmed];
+    saveCategories(updated);
+    setNewCatName('');
+    onNotify?.(`Category "${trimmed}" added`);
+  };
+
+  const handleRemoveCategory = (cat: string) => {
+    if (cat === 'All') return;
+    const updated = categories.filter(c => c !== cat);
+    saveCategories(updated);
+    if (activeFilter === cat) setActiveFilter('All');
+    onNotify?.(`Category "${cat}" removed`);
+  };
 
   const filteredImages = useMemo(() => {
     if (activeFilter === 'All') return images;
     return images.filter(img => img.category === activeFilter);
   }, [images, activeFilter]);
 
-const handleUpload = async () => {
+  const handleUpload = async () => {
     if (!selectedFile || !newImage.title) {
       onNotify?.("Please enter a title and select a file", 'error');
       return;
@@ -68,7 +101,7 @@ const handleUpload = async () => {
     }
 
     setImages(prev => [{ id: data.id.toString(), url: urlData.publicUrl, title: data.title, category: data.category }, ...prev]);
-    setNewImage({ title: '', category: 'Art' });
+    setNewImage({ title: '', category: categories.find(c => c !== 'All') || 'Art' });
     setSelectedFile(null);
     if (fileInputRef.current) fileInputRef.current.value = '';
     setUploading(false);
@@ -78,7 +111,6 @@ const handleUpload = async () => {
   const handleDeleteImage = async (id: string, url: string) => {
     if (!window.confirm("Delete this masterpiece?")) return;
 
-    // Extract filename from URL to delete from storage
     const fileName = url.split('/').pop();
     if (fileName) {
       await supabase.storage.from('portfolio').remove([fileName]);
@@ -107,13 +139,13 @@ const handleUpload = async () => {
 
         {/* Admin Upload Panel */}
         {isAdmin && (
-          <div className="mb-20 bg-gray-50 p-10 md:p-14 rounded-[4rem] border-4 border-dashed border-brand-pink/30 animate-fade-in">
+          <div className="mb-10 bg-gray-50 p-10 md:p-14 rounded-[4rem] border-4 border-dashed border-brand-pink/30 animate-fade-in">
             <h3 className="text-2xl font-bold serif text-brand-deep mb-8 flex items-center gap-4">
-              <span className="text-brand-pink">✦</span> Add New Portfolio Item
+              <span className="text-brand-pink">✦</span> {t.gallery.addTitle}
             </h3>
             <div className="grid grid-cols-1 md:grid-cols-4 gap-6 items-end">
               <div className="md:col-span-1">
-                <label className="block text-[10px] font-black uppercase tracking-widest text-gray-400 mb-2">Title</label>
+                <label className="block text-[10px] font-black uppercase tracking-widest text-gray-400 mb-2">{t.gallery.admin.titleLabel}</label>
                 <input
                   type="text"
                   className="w-full p-4 bg-white rounded-2xl border-2 border-transparent focus:border-brand-pink outline-none text-xs font-bold shadow-sm"
@@ -123,17 +155,17 @@ const handleUpload = async () => {
                 />
               </div>
               <div className="md:col-span-1">
-                <label className="block text-[10px] font-black uppercase tracking-widest text-gray-400 mb-2">Category</label>
+                <label className="block text-[10px] font-black uppercase tracking-widest text-gray-400 mb-2">{t.gallery.admin.categoryLabel}</label>
                 <select
                   className="w-full p-4 bg-white rounded-2xl border-2 border-transparent focus:border-brand-pink outline-none text-xs font-bold appearance-none shadow-sm cursor-pointer"
                   value={newImage.category}
                   onChange={e => setNewImage({...newImage, category: e.target.value})}
                 >
-                  {CATEGORIES.filter(c => c !== 'All').map(c => <option key={c} value={c}>{c}</option>)}
+                  {categories.filter(c => c !== 'All').map(c => <option key={c} value={c}>{c}</option>)}
                 </select>
               </div>
-             <div className="md:col-span-1">
-                <label className="block text-[10px] font-black uppercase tracking-widest text-gray-400 mb-2">Image File</label>
+              <div className="md:col-span-1">
+                <label className="block text-[10px] font-black uppercase tracking-widest text-gray-400 mb-2">{t.gallery.admin.fileLabel}</label>
                 <input
                   type="file"
                   accept="image/*"
@@ -148,15 +180,61 @@ const handleUpload = async () => {
                 disabled={uploading || !selectedFile || !newImage.title}
                 className="bg-brand-deep text-white p-4 rounded-2xl font-black uppercase text-[10px] tracking-widest hover:bg-brand-pink hover:text-brand-deep transition-all shadow-xl hover:scale-105 active:scale-95 disabled:opacity-30 disabled:cursor-not-allowed disabled:scale-100"
               >
-                {uploading ? 'Uploading...' : 'Add to Portfolio'}
+                {uploading ? t.gallery.admin.uploading : t.gallery.admin.addBtn}
               </button>
+            </div>
+
+            {/* Category Manager */}
+            <div className="mt-10 border-t-2 border-dashed border-brand-pink/20 pt-8">
+              <button
+                onClick={() => setShowCatManager(v => !v)}
+                className="flex items-center gap-3 text-[10px] font-black uppercase tracking-widest text-gray-400 hover:text-brand-deep transition-colors"
+              >
+                <span className={`transition-transform ${showCatManager ? 'rotate-90' : ''}`}>▶</span>
+                {t.gallery.admin.manageCategories}
+              </button>
+
+              {showCatManager && (
+                <div className="mt-6 animate-fade-in">
+                  {/* Existing categories */}
+                  <div className="flex flex-wrap gap-3 mb-6">
+                    {categories.filter(c => c !== 'All').map(cat => (
+                      <div key={cat} className="flex items-center gap-2 bg-white border-2 border-gray-100 rounded-xl px-4 py-2 shadow-sm">
+                        <span className="text-xs font-bold text-brand-deep">{cat}</span>
+                        <button
+                          onClick={() => handleRemoveCategory(cat)}
+                          className="w-5 h-5 bg-red-100 text-red-400 rounded-full flex items-center justify-center text-[10px] hover:bg-red-500 hover:text-white transition-all font-black"
+                        >✕</button>
+                      </div>
+                    ))}
+                  </div>
+                  {/* Add new category */}
+                  <div className="flex gap-4 items-center">
+                    <input
+                      type="text"
+                      value={newCatName}
+                      onChange={e => setNewCatName(e.target.value)}
+                      onKeyDown={e => e.key === 'Enter' && handleAddCategory()}
+                      placeholder={t.gallery.admin.newCategoryPlaceholder}
+                      className="p-3 bg-white rounded-2xl border-2 border-transparent focus:border-brand-pink outline-none text-xs font-bold shadow-sm w-48"
+                    />
+                    <button
+                      onClick={handleAddCategory}
+                      disabled={!newCatName.trim()}
+                      className="px-6 py-3 bg-brand-pink/20 text-brand-deep rounded-2xl font-black uppercase text-[10px] tracking-widest hover:bg-brand-pink hover:text-white transition-all disabled:opacity-30 disabled:cursor-not-allowed"
+                    >
+                      {t.gallery.admin.addCategoryBtn}
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         )}
 
         {/* Filter Section */}
         <div className="flex flex-wrap justify-center md:justify-start gap-3 md:gap-4 mb-12 md:mb-16">
-          {CATEGORIES.map((cat) => (
+          {categories.map((cat) => (
             <button
               key={cat}
               onClick={() => setActiveFilter(cat)}
@@ -166,7 +244,7 @@ const handleUpload = async () => {
                 : 'bg-white border-gray-50 text-gray-300 hover:border-brand-pink hover:text-brand-pink'
               }`}
             >
-              {cat === 'All' ? (language === 'fr' ? 'Tout' : 'All') : cat}
+              {cat === 'All' ? t.gallery.categories.all : cat}
             </button>
           ))}
         </div>
@@ -210,8 +288,8 @@ const handleUpload = async () => {
             <div className="w-16 h-16 md:w-20 md:h-20 bg-white rounded-full flex items-center justify-center mx-auto mb-6 md:mb-8 text-gray-200 shadow-sm">
               <svg className="w-8 h-8 md:w-10 md:h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
             </div>
-            <p className="text-gray-400 font-bold text-base md:text-lg mb-2">Portfolio is currently empty.</p>
-            <p className="text-brand-pink font-black text-[9px] md:text-[10px] uppercase tracking-[0.4em]">✦ Awaiting Fred's Masterpieces ✦</p>
+            <p className="text-gray-400 font-bold text-base md:text-lg mb-2">{t.gallery.emptyMessage}</p>
+            <p className="text-brand-pink font-black text-[9px] md:text-[10px] uppercase tracking-[0.4em]">✦ {t.gallery.emptySubtitle} ✦</p>
           </div>
         )}
       </div>
