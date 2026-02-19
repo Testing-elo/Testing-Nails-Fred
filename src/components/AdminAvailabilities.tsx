@@ -10,31 +10,50 @@ interface AdminAvailabilitiesProps {
   onNotify: (message: string) => void;
 }
 
+interface Booking {
+  time: string;
+  customer_name: string;
+  contact_method: string;
+  contact_detail: string;
+  service: string;
+  estimated_total: number;
+}
+
 const AdminAvailabilities: React.FC<AdminAvailabilitiesProps> = ({ onNotify }) => {
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [availableTimes, setAvailableTimes] = useState<Record<string, string[]>>({});
+  const [bookings, setBookings] = useState<Record<string, Booking[]>>({});
   const [activeDate, setActiveDate] = useState<string | null>(null);
   const [customTimeNum, setCustomTimeNum] = useState("");
   const [customTimePeriod, setCustomTimePeriod] = useState("AM");
 
-  // Load availabilities from Supabase on mount
   useEffect(() => {
-    const fetchAvailabilities = async () => {
-      const { data, error } = await supabase
-        .from('availabilities')
-        .select('*');
-      
+    const fetchData = async () => {
+      // Load availabilities
+      const { data: availData, error } = await supabase.from('availabilities').select('*');
       if (error) { console.error(error); return; }
-
       const times: Record<string, string[]> = {};
-      data.forEach((row: { date: string; time: string }) => {
+      availData.forEach((row: { date: string; time: string }) => {
         if (!times[row.date]) times[row.date] = [];
         times[row.date].push(row.time);
       });
       setAvailableTimes(times);
+
+      // Load bookings
+      const { data: bookingData } = await supabase
+        .from('bookings')
+        .select('date, time, customer_name, contact_method, contact_detail, service, estimated_total');
+      if (bookingData) {
+        const grouped: Record<string, Booking[]> = {};
+        bookingData.forEach((row: any) => {
+          if (!grouped[row.date]) grouped[row.date] = [];
+          grouped[row.date].push(row);
+        });
+        setBookings(grouped);
+      }
     };
 
-    fetchAvailabilities();
+    fetchData();
   }, []);
 
   const availableDates = Object.keys(availableTimes).filter(d => availableTimes[d].length > 0);
@@ -59,10 +78,7 @@ const AdminAvailabilities: React.FC<AdminAvailabilitiesProps> = ({ onNotify }) =
     const currentTimes = availableTimes[dateStr] || [];
     if (currentTimes.includes(time)) return;
 
-    const { error } = await supabase
-      .from('availabilities')
-      .insert({ date: dateStr, time });
-
+    const { error } = await supabase.from('availabilities').insert({ date: dateStr, time });
     if (error) { onNotify('Error adding time'); return; }
 
     const newTimes = [...currentTimes, time].sort((a, b) => {
@@ -81,12 +97,7 @@ const AdminAvailabilities: React.FC<AdminAvailabilitiesProps> = ({ onNotify }) =
   };
 
   const removeTime = async (dateStr: string, time: string) => {
-    const { error } = await supabase
-      .from('availabilities')
-      .delete()
-      .eq('date', dateStr)
-      .eq('time', time);
-
+    const { error } = await supabase.from('availabilities').delete().eq('date', dateStr).eq('time', time);
     if (error) { onNotify('Error removing time'); return; }
 
     const newTimes = (availableTimes[dateStr] || []).filter(t => t !== time);
@@ -97,11 +108,7 @@ const AdminAvailabilities: React.FC<AdminAvailabilitiesProps> = ({ onNotify }) =
   const clearDate = async (dateStr: string) => {
     if (!window.confirm("Clear all slots for this date?")) return;
 
-    const { error } = await supabase
-      .from('availabilities')
-      .delete()
-      .eq('date', dateStr);
-
+    const { error } = await supabase.from('availabilities').delete().eq('date', dateStr);
     if (error) { onNotify('Error clearing date'); return; }
 
     setAvailableTimes(prev => { const u = { ...prev }; delete u[dateStr]; return u; });
@@ -128,6 +135,8 @@ const AdminAvailabilities: React.FC<AdminAvailabilitiesProps> = ({ onNotify }) =
     setCustomTimeNum(val.replace(/[^0-9:]/g, ''));
   };
 
+  const activeDateBookings = activeDate ? (bookings[activeDate] || []) : [];
+
   return (
     <section className="py-20 md:py-32 bg-gray-50 relative min-h-screen">
       <div className="max-w-5xl mx-auto px-6">
@@ -140,6 +149,7 @@ const AdminAvailabilities: React.FC<AdminAvailabilitiesProps> = ({ onNotify }) =
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+          {/* Calendar */}
           <div className="lg:col-span-7 bg-white p-8 md:p-12 rounded-[4rem] shadow-2xl border-4 border-white animate-fade-in">
             <div className="flex justify-between items-center mb-10">
               <h3 className="text-2xl font-bold serif text-brand-deep">
@@ -161,6 +171,7 @@ const AdminAvailabilities: React.FC<AdminAvailabilitiesProps> = ({ onNotify }) =
                 const dateStr = date.toDateString();
                 const isActive = activeDate === dateStr;
                 const hasSlots = (availableTimes[dateStr] || []).length > 0;
+                const hasBookings = (bookings[dateStr] || []).length > 0;
                 return (
                   <button key={idx} onClick={() => toggleDateSelection(dateStr)}
                     className={`relative w-full aspect-square flex flex-col items-center justify-center rounded-2xl text-xs font-black transition-all border-2 ${
@@ -169,17 +180,30 @@ const AdminAvailabilities: React.FC<AdminAvailabilitiesProps> = ({ onNotify }) =
                       'bg-white text-gray-200 border-gray-50 hover:border-brand-pink/50'
                     }`}>
                     {date.getDate()}
+                    {/* Pink dot for available slots */}
                     {hasSlots && !isActive && <span className="absolute bottom-1 w-1 h-1 bg-brand-pink rounded-full"></span>}
+                    {/* Dark dot for bookings */}
+                    {hasBookings && !isActive && <span className="absolute bottom-1 right-2 w-1.5 h-1.5 bg-brand-deep rounded-full"></span>}
                   </button>
                 );
               })}
             </div>
+            {/* Legend */}
+            <div className="flex gap-6 mt-6 pt-6 border-t border-gray-50">
+              <div className="flex items-center gap-2 text-[9px] font-black uppercase tracking-widest text-gray-400">
+                <span className="w-2 h-2 bg-brand-pink rounded-full"></span> Available
+              </div>
+              <div className="flex items-center gap-2 text-[9px] font-black uppercase tracking-widest text-gray-400">
+                <span className="w-2 h-2 bg-brand-deep rounded-full"></span> Booked
+              </div>
+            </div>
           </div>
 
+          {/* Day Panel */}
           <div className="lg:col-span-5">
             {activeDate ? (
-              <div className="bg-white p-10 rounded-[4rem] shadow-2xl border-4 border-brand-pink/20 animate-fade-in sticky top-32">
-                <div className="flex justify-between items-start mb-8">
+              <div className="bg-white p-10 rounded-[4rem] shadow-2xl border-4 border-brand-pink/20 animate-fade-in sticky top-32 space-y-8">
+                <div className="flex justify-between items-start">
                   <div>
                     <h4 className="text-[10px] font-black uppercase tracking-[0.4em] text-brand-pink mb-2">Manage Day</h4>
                     <h3 className="text-2xl font-bold serif text-brand-deep">{new Date(activeDate).toLocaleDateString(undefined, { weekday: 'long', month: 'short', day: 'numeric' })}</h3>
@@ -188,7 +212,46 @@ const AdminAvailabilities: React.FC<AdminAvailabilitiesProps> = ({ onNotify }) =
                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
                   </button>
                 </div>
-                <form onSubmit={handleCustomTimeSubmit} className="mb-8 space-y-4">
+
+                {/* Bookings for this day */}
+                {activeDateBookings.length > 0 && (
+                  <div>
+                    <h5 className="text-[9px] font-black uppercase tracking-widest text-brand-deep mb-4 flex items-center gap-2">
+                      <span className="w-2 h-2 bg-brand-deep rounded-full"></span>
+                      Bookings ({activeDateBookings.length})
+                    </h5>
+                    <div className="space-y-3 max-h-[280px] overflow-y-auto pr-1 custom-scrollbar">
+                      {activeDateBookings
+                        .sort((a, b) => {
+                          const parse = (t: string) => {
+                            const [timePart, period] = t.split(' ');
+                            let [h, m] = timePart.split(':').map(Number);
+                            if (period === 'PM' && h < 12) h += 12;
+                            if (period === 'AM' && h === 12) h = 0;
+                            return h * 60 + (m || 0);
+                          };
+                          return parse(a.time) - parse(b.time);
+                        })
+                        .map((booking, i) => (
+                          <div key={i} className="p-5 bg-brand-deep/5 rounded-3xl border border-brand-deep/10 animate-fade-in">
+                            <div className="flex justify-between items-center mb-3">
+                              <span className="text-[10px] font-black text-brand-deep bg-brand-deep text-white px-3 py-1 rounded-full">{booking.time}</span>
+                              <span className="text-[10px] font-black text-brand-pink">${booking.estimated_total}</span>
+                            </div>
+                            <p className="text-sm font-bold text-brand-deep mb-1">{booking.customer_name}</p>
+                            <p className="text-[10px] text-gray-400 font-medium mb-1 italic">{booking.service}</p>
+                            <div className="flex items-center gap-2 mt-2">
+                              <span className="text-[8px] font-black uppercase tracking-widest text-gray-300 bg-gray-100 px-2 py-1 rounded-full">{booking.contact_method}</span>
+                              <span className="text-[10px] text-gray-500 font-medium">{booking.contact_detail}</span>
+                            </div>
+                          </div>
+                        ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Add custom time */}
+                <form onSubmit={handleCustomTimeSubmit} className="space-y-4">
                   <div className="flex gap-2">
                     <input type="text" inputMode="numeric" placeholder="e.g. 10:30"
                       className="flex-grow p-4 bg-gray-50 rounded-2xl border-2 border-transparent focus:border-brand-deep outline-none text-xs font-bold"
@@ -203,34 +266,50 @@ const AdminAvailabilities: React.FC<AdminAvailabilitiesProps> = ({ onNotify }) =
                     Add Available Time Slot
                   </button>
                 </form>
-                <h5 className="text-[9px] font-black uppercase tracking-widest text-gray-400 mb-4">Quick Toggle Presets</h5>
-                <div className="flex flex-wrap gap-2 mb-8">
-                  {PRESET_TIME_SLOTS.map(slot => {
-                    const isSelected = (availableTimes[activeDate] || []).includes(slot);
-                    return (
-                      <button key={slot} onClick={() => isSelected ? removeTime(activeDate, slot) : addTime(activeDate, slot)}
-                        className={`px-4 py-3 rounded-xl text-[9px] font-black uppercase transition-all border-2 ${
-                          isSelected ? 'bg-brand-pink text-brand-deep border-brand-pink' : 'bg-gray-50 text-gray-300 border-transparent hover:border-brand-pink/30'
-                        }`}>
-                        {slot}
-                      </button>
-                    );
-                  })}
-                </div>
-                <h5 className="text-[9px] font-black uppercase tracking-widest text-gray-400 mb-4">Current Availability</h5>
-                <div className="space-y-2 max-h-[300px] overflow-y-auto pr-2 custom-scrollbar">
-                  {(availableTimes[activeDate] || []).length > 0 ? (
-                    (availableTimes[activeDate] || []).map(time => (
-                      <div key={time} className="flex items-center justify-between p-4 bg-brand-deep/5 rounded-2xl group animate-fade-in border border-transparent hover:border-brand-pink/20">
-                        <span className="text-xs font-black text-brand-deep">{time}</span>
-                        <button onClick={() => removeTime(activeDate, time)} className="text-red-400 hover:text-red-600 transition-colors opacity-0 group-hover:opacity-100">
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+
+                {/* Preset toggles */}
+                <div>
+                  <h5 className="text-[9px] font-black uppercase tracking-widest text-gray-400 mb-4">Quick Toggle Presets</h5>
+                  <div className="flex flex-wrap gap-2">
+                    {PRESET_TIME_SLOTS.map(slot => {
+                      const isSelected = (availableTimes[activeDate] || []).includes(slot);
+                      return (
+                        <button key={slot} onClick={() => isSelected ? removeTime(activeDate, slot) : addTime(activeDate, slot)}
+                          className={`px-4 py-3 rounded-xl text-[9px] font-black uppercase transition-all border-2 ${
+                            isSelected ? 'bg-brand-pink text-brand-deep border-brand-pink' : 'bg-gray-50 text-gray-300 border-transparent hover:border-brand-pink/30'
+                          }`}>
+                          {slot}
                         </button>
-                      </div>
-                    ))
-                  ) : (
-                    <div className="text-[10px] text-gray-300 italic py-4">No hours set for this day.</div>
-                  )}
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Current availability */}
+                <div>
+                  <h5 className="text-[9px] font-black uppercase tracking-widest text-gray-400 mb-4">Current Availability</h5>
+                  <div className="space-y-2 max-h-[200px] overflow-y-auto pr-2 custom-scrollbar">
+                    {(availableTimes[activeDate] || []).length > 0 ? (
+                      (availableTimes[activeDate] || []).map(time => {
+                        const isBooked = activeDateBookings.some(b => b.time === time);
+                        return (
+                          <div key={time} className={`flex items-center justify-between p-4 rounded-2xl group animate-fade-in border ${isBooked ? 'bg-brand-deep/10 border-brand-deep/20' : 'bg-brand-deep/5 border-transparent hover:border-brand-pink/20'}`}>
+                            <div className="flex items-center gap-3">
+                              <span className="text-xs font-black text-brand-deep">{time}</span>
+                              {isBooked && <span className="text-[8px] font-black uppercase tracking-widest text-white bg-brand-deep px-2 py-0.5 rounded-full">Booked</span>}
+                            </div>
+                            {!isBooked && (
+                              <button onClick={() => removeTime(activeDate, time)} className="text-red-400 hover:text-red-600 transition-colors opacity-0 group-hover:opacity-100">
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                              </button>
+                            )}
+                          </div>
+                        );
+                      })
+                    ) : (
+                      <div className="text-[10px] text-gray-300 italic py-4">No hours set for this day.</div>
+                    )}
+                  </div>
                 </div>
               </div>
             ) : (
