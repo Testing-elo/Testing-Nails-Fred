@@ -34,7 +34,13 @@ const Gallery: React.FC<GalleryProps> = ({ isAdmin = false, onNotify }) => {
     // Load saved categories from localStorage
     const saved = localStorage.getItem('portfolio_categories');
     if (saved) {
-      try { setCategories(JSON.parse(saved)); } catch {}
+      try {
+        const parsed: string[] = JSON.parse(saved);
+        setCategories(parsed);
+        // Sync the upload form's category to the first real category available
+        const firstReal = parsed.find(c => c !== 'All');
+        if (firstReal) setNewImage(prev => ({ ...prev, category: firstReal }));
+      } catch {}
     }
   }, []);
 
@@ -49,6 +55,7 @@ const Gallery: React.FC<GalleryProps> = ({ isAdmin = false, onNotify }) => {
     const updated = [...categories, trimmed];
     saveCategories(updated);
     setNewCatName('');
+    setNewImage(prev => ({ ...prev, category: trimmed }));
     onNotify?.(`Category "${trimmed}" added`);
   };
 
