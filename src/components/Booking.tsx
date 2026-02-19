@@ -18,9 +18,8 @@ const Booking: React.FC<BookingProps> = ({ onBack, initialDate, initialTime }) =
   const [availabilities, setAvailabilities] = useState<{ dates: string[], times: Record<string, string[]> }>({ dates: [], times: {} });
   const [bookings, setBookings] = useState<{ date: string, time: string }[]>([]);
 
-useEffect(() => {
+  useEffect(() => {
     const fetchData = async () => {
-      // Load availabilities from Supabase
       const { data: availData } = await supabase.from('availabilities').select('*');
       if (availData) {
         const times: Record<string, string[]> = {};
@@ -32,7 +31,6 @@ useEffect(() => {
         setAvailabilities({ dates, times });
       }
 
-      // Load bookings from Supabase
       const { data: bookingData } = await supabase.from('bookings').select('date, time');
       if (bookingData) setBookings(bookingData);
     };
@@ -73,6 +71,11 @@ useEffect(() => {
     return days;
   }, [currentMonth]);
 
+  // Localized day headers
+  const dayHeaders = language === 'fr'
+    ? ['D', 'L', 'M', 'M', 'J', 'V', 'S']
+    : ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
+
   const timeSlotsForDate = useMemo(() => {
     if (!selectedDate) return [];
     const rawTimes = availabilities.times[selectedDate.toDateString()] || [];
@@ -112,7 +115,7 @@ useEffect(() => {
 
   const isStepValid = () => {
     if (step === 1) return !!formState.lengthId;
-    if (step === 2) return true; // Add-ons are optional
+    if (step === 2) return true;
     if (step === 3) return !!selectedDate && !!selectedTime;
     if (step === 4) {
       const isNameValid = formState.name.trim() !== '';
@@ -125,56 +128,54 @@ useEffect(() => {
     }
     return true;
   };
-const handleInspirationUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-  const file = e.target.files?.[0];
-  if (!file) return;
-  const reader = new FileReader();
-  reader.onloadend = () => setInspirationImage(reader.result as string);
-  reader.readAsDataURL(file);
-};
-const handleFinalSubmit = async () => {
+
+  const handleInspirationUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onloadend = () => setInspirationImage(reader.result as string);
+    reader.readAsDataURL(file);
+  };
+
+  const handleFinalSubmit = async () => {
     if (!selectedDate || !selectedTime) return;
 
-// Send booking data to N8N webhook
-  try {
-    await fetch('https://testingweb.app.n8n.cloud/webhook-test/72f548be-e447-443a-a4af-0920318bcd20', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        inspirationImage: inspirationImage || null,
-        customerName: formState.name,
-        contactMethod: formState.contactMethod,
-        contactDetail: formState.contactDetail,
-        service: totals.baseName,
-        addons: totals.items,
-        date: selectedDate?.toLocaleDateString(),
-        time: selectedTime,
-        estimatedTotal: totals.price,
-        timestamp: new Date().toISOString()
-      })
+    try {
+      await fetch('https://testingweb.app.n8n.cloud/webhook-test/72f548be-e447-443a-a4af-0920318bcd20', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          inspirationImage: inspirationImage || null,
+          customerName: formState.name,
+          contactMethod: formState.contactMethod,
+          contactDetail: formState.contactDetail,
+          service: totals.baseName,
+          addons: totals.items,
+          date: selectedDate?.toLocaleDateString(),
+          time: selectedTime,
+          estimatedTotal: totals.price,
+          timestamp: new Date().toISOString()
+        })
+      });
+    } catch (error) {
+      console.error('Failed to send booking:', error);
+    }
+
+    await supabase.from('bookings').insert({
+      date: selectedDate.toDateString(),
+      time: selectedTime,
+      customer_name: formState.name,
+      contact_method: formState.contactMethod,
+      contact_detail: formState.contactDetail,
+      service: totals.baseName,
+      addons: totals.items,
+      estimated_total: totals.price
     });
-  } catch (error) {
-    console.error('Failed to send booking:', error);
-  }
 
-// Save booking to Supabase
-  await supabase.from('bookings').insert({
-    date: selectedDate.toDateString(),
-    time: selectedTime,
-    customer_name: formState.name,
-    contact_method: formState.contactMethod,
-    contact_detail: formState.contactDetail,
-    service: totals.baseName,
-    addons: totals.items,
-    estimated_total: totals.price
-  });
-
-  const newBooking = { date: selectedDate.toDateString(), time: selectedTime };
-  const updatedBookings = [...bookings, newBooking];
-  setBookings(updatedBookings);
-
-  setShowSuccess(true);
-};
+    const newBooking = { date: selectedDate.toDateString(), time: selectedTime };
+    setBookings([...bookings, newBooking]);
+    setShowSuccess(true);
+  };
 
   const nextStep = () => {
     if (!isStepValid()) return;
@@ -188,10 +189,7 @@ const handleFinalSubmit = async () => {
   const prevStep = () => setStep(s => Math.max(s - 1, 1));
 
   const toggleAddon = (id: string) => {
-    setSelectedAddons(prev => ({
-      ...prev,
-      [id]: prev[id] ? 0 : 1
-    }));
+    setSelectedAddons(prev => ({ ...prev, [id]: prev[id] ? 0 : 1 }));
   };
 
   const updateAddonQty = (id: string, delta: number) => {
@@ -206,28 +204,28 @@ const handleFinalSubmit = async () => {
 
   const formatPhoneNumber = (value: string) => {
     const phoneNumber = value.replace(/\D/g, '').slice(0, 10);
-    const phoneNumberLength = phoneNumber.length;
-    if (phoneNumberLength <= 3) return phoneNumber;
-    if (phoneNumberLength <= 6) {
-      return `(${phoneNumber.slice(0, 3)})-${phoneNumber.slice(3)}`;
-    }
+    const len = phoneNumber.length;
+    if (len <= 3) return phoneNumber;
+    if (len <= 6) return `(${phoneNumber.slice(0, 3)})-${phoneNumber.slice(3)}`;
     return `(${phoneNumber.slice(0, 3)})-${phoneNumber.slice(3, 6)}-${phoneNumber.slice(6, 10)}`;
   };
 
   const handleContactDetailChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     let value = e.target.value;
-    if (formState.contactMethod === 'phone') {
-      value = formatPhoneNumber(value);
-    }
+    if (formState.contactMethod === 'phone') value = formatPhoneNumber(value);
     setFormState({ ...formState, contactDetail: value });
   };
 
   if (showSuccess) return (
     <div className="max-w-4xl mx-auto px-4 py-20 text-center animate-fade-in">
       <div className="w-24 h-24 bg-brand-deep text-white rounded-full flex items-center justify-center mx-auto mb-10 text-4xl shadow-2xl">✦</div>
-      <h2 className="text-5xl md:text-6xl font-bold serif text-brand-deep mb-6">Request Sent!</h2>
-      <p className="text-gray-500 mb-12 italic text-lg">Fred will review your request and reach out shortly via {formState.contactMethod}: <b>{formState.contactDetail}</b>.</p>
-      <button onClick={onBack} className="px-14 py-6 bg-brand-deep text-white rounded-full font-black uppercase tracking-[0.4em] text-[10px] shadow-2xl hover:scale-105 transition-all">Return Home</button>
+      <h2 className="text-5xl md:text-6xl font-bold serif text-brand-deep mb-6">{t.booking.thankYou.title}</h2>
+      <p className="text-gray-500 mb-12 italic text-lg">
+        {t.booking.thankYou.message.replace('{method}', formState.contactMethod).replace('{detail}', formState.contactDetail)}
+      </p>
+      <button onClick={onBack} className="px-14 py-6 bg-brand-deep text-white rounded-full font-black uppercase tracking-[0.4em] text-[10px] shadow-2xl hover:scale-105 transition-all">
+        {t.booking.thankYou.returnBtn}
+      </button>
     </div>
   );
 
@@ -236,7 +234,7 @@ const handleFinalSubmit = async () => {
       <div className="max-w-7xl mx-auto px-4">
         <div className="mb-16 md:mb-20 text-center">
           <button onClick={onBack} className="inline-flex items-center text-[10px] font-black uppercase tracking-[0.4em] text-gray-400 hover:text-brand-deep transition-all mb-12 group">
-            <span className="mr-2 group-hover:-translate-x-1 transition-transform">←</span> Exit Booking
+            <span className="mr-2 group-hover:-translate-x-1 transition-transform">←</span> {t.booking.exitBooking}
           </button>
           <div className="flex items-center justify-center space-x-2 md:space-x-8">
             {[1, 2, 3, 4].map(num => (
@@ -252,10 +250,12 @@ const handleFinalSubmit = async () => {
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 md:gap-16">
           <div className="lg:col-span-8 space-y-12">
+
+            {/* Step 1 — Length */}
             {step === 1 && (
               <div className="bg-white p-8 md:p-16 rounded-[3rem] md:rounded-[4rem] shadow-2xl animate-fade-in border-4 border-white">
-                <span className="text-brand-pink font-black text-[10px] uppercase tracking-[0.5em] mb-4 block">Step 01</span>
-                <h2 className="text-3xl md:text-5xl font-bold serif mb-10 md:mb-12 text-brand-deep">Select Length</h2>
+                <span className="text-brand-pink font-black text-[10px] uppercase tracking-[0.5em] mb-4 block">{t.booking.steps.step01}</span>
+                <h2 className="text-3xl md:text-5xl font-bold serif mb-10 md:mb-12 text-brand-deep">{t.booking.steps.selectLength}</h2>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-8">
                   {SIZINGS.map((s) => (
                     <button key={s.id} onClick={() => setFormState({...formState, lengthId: s.id})} className={`p-8 md:p-10 text-left rounded-[2.5rem] md:rounded-[3rem] border-4 transition-all relative overflow-hidden group ${formState.lengthId === s.id ? 'border-brand-deep bg-white shadow-2xl scale-[1.02]' : 'border-gray-50 bg-gray-50/30 hover:border-brand-pink/50'}`}>
@@ -273,11 +273,12 @@ const handleFinalSubmit = async () => {
               </div>
             )}
 
+            {/* Step 2 — Add-ons */}
             {step === 2 && (
               <div className="bg-white p-8 md:p-16 rounded-[3rem] md:rounded-[4rem] shadow-2xl animate-fade-in border-4 border-white">
-                <span className="text-brand-pink font-black text-[10px] uppercase tracking-[0.5em] mb-4 block">Step 02</span>
-                <h2 className="text-3xl md:text-5xl font-bold serif mb-10 md:mb-12 text-brand-deep">Enhance Your Set</h2>
-                <p className="text-gray-400 text-xs font-medium mb-10 uppercase tracking-widest italic">Pick quantities for details & designs (max 20)</p>
+                <span className="text-brand-pink font-black text-[10px] uppercase tracking-[0.5em] mb-4 block">{t.booking.steps.step02}</span>
+                <h2 className="text-3xl md:text-5xl font-bold serif mb-10 md:mb-12 text-brand-deep">{t.booking.steps.enhanceSet}</h2>
+                <p className="text-gray-400 text-xs font-medium mb-10 uppercase tracking-widest italic">{t.booking.steps.enhanceSubtitle}</p>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 md:gap-6">
                   {ADDONS.map((addon) => {
                     const qty = selectedAddons[addon.id] || 0;
@@ -304,18 +305,19 @@ const handleFinalSubmit = async () => {
               </div>
             )}
 
+            {/* Step 3 — Calendar */}
             {step === 3 && (
               <div className="bg-white p-8 md:p-16 rounded-[3rem] md:rounded-[4rem] shadow-2xl animate-fade-in border-4 border-white">
-                <span className="text-brand-pink font-black text-[10px] uppercase tracking-[0.5em] mb-4 block">Step 03</span>
+                <span className="text-brand-pink font-black text-[10px] uppercase tracking-[0.5em] mb-4 block">{t.booking.steps.step03}</span>
                 <div className="flex justify-between items-center mb-10 md:mb-12">
-                  <h2 className="text-3xl md:text-5xl font-bold serif text-brand-deep">Pick a Slot</h2>
+                  <h2 className="text-3xl md:text-5xl font-bold serif text-brand-deep">{t.booking.steps.pickSlot}</h2>
                   <div className="flex gap-4">
                     <button onClick={() => setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1, 1))} className="p-3 bg-gray-50 rounded-full hover:bg-brand-pink/20 transition-all">←</button>
                     <button onClick={() => setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 1))} className="p-3 bg-gray-50 rounded-full hover:bg-brand-pink/20 transition-all">→</button>
                   </div>
                 </div>
                 <div className="grid grid-cols-7 gap-3 md:gap-4 mb-12">
-                  {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map(d => <div key={d} className="text-center text-[9px] font-black text-gray-300 uppercase">{d}</div>)}
+                  {dayHeaders.map((d, i) => <div key={i} className="text-center text-[9px] font-black text-gray-300 uppercase">{d}</div>)}
                   {calendarDays.map((date, idx) => {
                     if (!date) return <div key={idx}></div>;
                     const dateStr = date.toDateString();
@@ -336,8 +338,8 @@ const handleFinalSubmit = async () => {
                         }`}
                       >
                         <span className={isPast ? 'line-through' : ''}>{date.getDate()}</span>
-                        {isPast && <span className="absolute bottom-1 text-[6px] uppercase tracking-tighter opacity-50">Past</span>}
-                        {!isAvailable && !isPast && <span className="absolute bottom-1 text-[5px] uppercase tracking-widest opacity-40">N/A</span>}
+                        {isPast && <span className="absolute bottom-1 text-[6px] uppercase tracking-tighter opacity-50">{t.booking.steps.past}</span>}
+                        {!isAvailable && !isPast && <span className="absolute bottom-1 text-[5px] uppercase tracking-widest opacity-40">{t.booking.steps.na}</span>}
                       </button>
                     );
                   })}
@@ -360,46 +362,53 @@ const handleFinalSubmit = async () => {
                             }`}
                           >
                             <span className={slot.isBooked ? 'line-through' : ''}>{slot.time}</span>
-                            {slot.isBooked && <span className="absolute inset-0 flex items-center justify-center bg-gray-100/30 text-[8px] uppercase font-black text-gray-400">Booked</span>}
+                            {slot.isBooked && <span className="absolute inset-0 flex items-center justify-center bg-gray-100/30 text-[8px] uppercase font-black text-gray-400">{t.booking.steps.booked}</span>}
                           </button>
                         ))}
                       </div>
                     ) : (
-                      <div className="text-center py-8 text-gray-300 italic text-xs border-2 border-dashed border-gray-100 rounded-3xl">All slots booked or unavailable.</div>
+                      <div className="text-center py-8 text-gray-300 italic text-xs border-2 border-dashed border-gray-100 rounded-3xl">{t.booking.steps.noSlots}</div>
                     )}
                   </div>
                 )}
               </div>
             )}
 
+            {/* Step 4 — Details */}
             {step === 4 && (
               <div className="bg-white p-8 md:p-16 rounded-[3rem] md:rounded-[4rem] shadow-2xl border-4 border-white animate-fade-in">
-                <span className="text-brand-pink font-black text-[10px] uppercase tracking-[0.5em] mb-4 block">Step 04</span>
-                <h2 className="text-3xl md:text-5xl font-bold serif mb-10 md:mb-12 text-brand-deep">Your Details</h2>
+                <span className="text-brand-pink font-black text-[10px] uppercase tracking-[0.5em] mb-4 block">{t.booking.steps.step04}</span>
+                <h2 className="text-3xl md:text-5xl font-bold serif mb-10 md:mb-12 text-brand-deep">{t.booking.steps.yourDetails}</h2>
                 <div className="space-y-10">
                   <div className="space-y-4">
-                    <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 block ml-6">Full Name</label>
+                    <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 block ml-6">{t.booking.steps.fullName}</label>
                     <input type="text" className="w-full p-8 bg-gray-50 border-2 border-transparent rounded-[2.5rem] outline-none focus:border-brand-deep focus:bg-white text-lg font-medium transition-all" value={formState.name} onChange={(e) => setFormState({...formState, name: e.target.value})} placeholder="e.g. Jane Doe" />
                   </div>
                   
                   <div className="space-y-4">
-                    <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 block ml-6">How should Fred reach you?</label>
+                    <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 block ml-6">{t.booking.steps.howContact}</label>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      {['email', 'phone'].map(method => (
-                        <button key={method} onClick={() => setFormState({...formState, contactMethod: method, contactDetail: ''})} className={`py-6 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all border-2 ${formState.contactMethod === method ? 'bg-brand-deep text-white border-brand-deep shadow-lg' : 'bg-white text-gray-400 border-gray-50 hover:border-brand-pink'}`}>{method}</button>
+                      {(['email', 'phone'] as const).map(method => (
+                        <button key={method} onClick={() => setFormState({...formState, contactMethod: method, contactDetail: ''})} className={`py-6 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all border-2 ${formState.contactMethod === method ? 'bg-brand-deep text-white border-brand-deep shadow-lg' : 'bg-white text-gray-400 border-gray-50 hover:border-brand-pink'}`}>
+                          {method === 'email' ? t.booking.steps.emailMethod : t.booking.steps.phoneMethod}
+                        </button>
                       ))}
                     </div>
                   </div>
 
-                 {formState.contactMethod && (
-                     <div className="animate-fade-in space-y-4">
-                        <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 block ml-6">Your {formState.contactMethod} detail</label>
-                        <input type="text" className="w-full p-8 bg-gray-50 border-2 border-transparent rounded-[2.5rem] outline-none focus:border-brand-deep focus:bg-white text-lg font-medium transition-all" placeholder={formState.contactMethod === 'phone' ? '(514)-123-4567' : `Enter your ${formState.contactMethod}...`} value={formState.contactDetail} onChange={handleContactDetailChange} />
-                     </div>
+                  {formState.contactMethod && (
+                    <div className="animate-fade-in space-y-4">
+                      <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 block ml-6">
+                        {t.booking.steps.yourContactDetail.replace('{method}', formState.contactMethod === 'phone' ? t.booking.steps.phoneMethod : t.booking.steps.emailMethod)}
+                      </label>
+                      <input type="text" className="w-full p-8 bg-gray-50 border-2 border-transparent rounded-[2.5rem] outline-none focus:border-brand-deep focus:bg-white text-lg font-medium transition-all" placeholder={formState.contactMethod === 'phone' ? '(514)-123-4567' : t.booking.steps.emailPlaceholder} value={formState.contactDetail} onChange={handleContactDetailChange} />
+                    </div>
                   )}
 
                   <div className="animate-fade-in space-y-4">
-                    <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 block ml-6">Inspiration Photo <span className="text-brand-pink">(Optional)</span></label>
+                    <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 block ml-6">
+                      {t.booking.steps.inspirationPhoto} <span className="text-brand-pink">({t.booking.steps.optional})</span>
+                    </label>
                     <input
                       type="file"
                       accept="image/*"
@@ -409,54 +418,65 @@ const handleFinalSubmit = async () => {
                     {inspirationImage && (
                       <div className="relative w-32 h-32 rounded-2xl overflow-hidden border-4 border-brand-pink shadow-lg">
                         <img src={inspirationImage} alt="Inspiration" className="w-full h-full object-cover" />
-                        <button
-                          type="button"
-                          onClick={() => setInspirationImage(null)}
-                          className="absolute top-2 right-2 w-6 h-6 bg-red-500 text-white rounded-full text-xs flex items-center justify-center"
-                        >✕</button>
+                        <button type="button" onClick={() => setInspirationImage(null)} className="absolute top-2 right-2 w-6 h-6 bg-red-500 text-white rounded-full text-xs flex items-center justify-center">✕</button>
                       </div>
                     )}
-                 </div>
+                  </div>
                 </div>
               </div>
             )}
 
-           <div className="flex justify-between items-center pt-12">
+            {/* Navigation */}
+            <div className="flex justify-between items-center pt-12">
               {step > 1 ? (
-                <button onClick={prevStep} className="px-10 py-5 text-gray-400 font-black uppercase tracking-[0.4em] text-[10px] flex items-center hover:text-brand-deep transition-all"><span className="mr-3">←</span> Back</button>
+                <button onClick={prevStep} className="px-10 py-5 text-gray-400 font-black uppercase tracking-[0.4em] text-[10px] flex items-center hover:text-brand-deep transition-all">
+                  <span className="mr-3">←</span> {t.booking.steps.back}
+                </button>
               ) : <div />}
               
-              <button onClick={nextStep} disabled={!isStepValid()} className={`px-14 py-6 bg-brand-deep text-white rounded-full font-black uppercase tracking-[0.4em] text-[10px] shadow-2xl transition-all ${!isStepValid() ? 'opacity-20 cursor-not-allowed translate-y-2' : 'hover:scale-105 active:scale-95'}`}>{step === 4 ? 'Send Request ✦' : 'Next Step'}</button>
+              <button onClick={nextStep} disabled={!isStepValid()} className={`px-14 py-6 bg-brand-deep text-white rounded-full font-black uppercase tracking-[0.4em] text-[10px] shadow-2xl transition-all ${!isStepValid() ? 'opacity-20 cursor-not-allowed translate-y-2' : 'hover:scale-105 active:scale-95'}`}>
+                {step === 4 ? `${t.booking.steps.sendRequest} ✦` : t.booking.steps.nextStep}
+              </button>
             </div>
           </div>
 
+          {/* Summary Sidebar */}
           <div className="lg:col-span-4 lg:sticky lg:top-32 h-fit">
             <div className="bg-white p-10 md:p-12 rounded-[3.5rem] md:rounded-[4rem] shadow-2xl border-4 border-[#FFC0CB]/30 relative overflow-hidden">
-               <h3 className="text-2xl font-bold serif mb-10 text-brand-deep border-b border-gray-50 pb-6">Summary</h3>
-               <div className="space-y-6">
-                 <div className="flex justify-between items-start">
-                    <div>
-                      <span className="text-gray-400 uppercase tracking-widest text-[8px] font-black block mb-1">Base Selection</span>
-                      <span className="text-brand-deep font-bold text-xs">{totals.baseName}</span>
+              <h3 className="text-2xl font-bold serif mb-10 text-brand-deep border-b border-gray-50 pb-6">{t.booking.steps.summary}</h3>
+              <div className="space-y-6">
+                <div className="flex justify-between items-start">
+                  <div>
+                    <span className="text-gray-400 uppercase tracking-widest text-[8px] font-black block mb-1">{t.booking.steps.baseSelection}</span>
+                    <span className="text-brand-deep font-bold text-xs">{totals.baseName}</span>
+                  </div>
+                  <span className="text-brand-deep font-black text-xs">{SIZINGS.find(s => s.id === formState.lengthId)?.price}</span>
+                </div>
+                {totals.items.length > 0 && (
+                  <div className="space-y-4 pt-2">
+                    <span className="text-gray-400 uppercase tracking-widest text-[8px] font-black block">{t.booking.steps.customAddons}</span>
+                    {totals.items.map((item, i) => (
+                      <div key={i} className="flex justify-between items-center text-[10px] animate-fade-in">
+                        <span className="text-gray-500 font-medium">{item.name}</span>
+                        <span className="text-brand-deep font-bold">{item.price}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {selectedDate && (
+                  <div className="pt-6 border-t border-gray-50 animate-fade-in">
+                    <span className="text-gray-400 uppercase tracking-widest text-[8px] font-black block mb-2">{t.booking.steps.requestedSlot}</span>
+                    <div className="bg-brand-pink/10 p-4 rounded-2xl flex items-center justify-between">
+                      <span className="text-brand-deep font-black text-[9px]">{selectedDate.toLocaleDateString(language === 'fr' ? 'fr-CA' : undefined, { month: 'short', day: 'numeric', year: 'numeric' })}</span>
+                      <span className="text-brand-deep font-black text-[10px]">{selectedTime || '...'}</span>
                     </div>
-                    <span className="text-brand-deep font-black text-xs">{SIZINGS.find(s => s.id === formState.lengthId)?.price}</span>
-                 </div>
-                 {totals.items.length > 0 && (
-                    <div className="space-y-4 pt-2">
-                       <span className="text-gray-400 uppercase tracking-widest text-[8px] font-black block">Custom Add-ons</span>
-                       {totals.items.map((item, i) => (
-                         <div key={i} className="flex justify-between items-center text-[10px] animate-fade-in"><span className="text-gray-500 font-medium">{item.name}</span><span className="text-brand-deep font-bold">{item.price}</span></div>
-                       ))}
-                    </div>
-                 )}
-                 {selectedDate && (
-                   <div className="pt-6 border-t border-gray-50 animate-fade-in">
-                      <span className="text-gray-400 uppercase tracking-widest text-[8px] font-black block mb-2">Requested Slot</span>
-                      <div className="bg-brand-pink/10 p-4 rounded-2xl flex items-center justify-between"><span className="text-brand-deep font-black text-[9px]">{selectedDate.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}</span><span className="text-brand-deep font-black text-[10px]">{selectedTime || '...'}</span></div>
-                   </div>
-                 )}
-                 <div className="pt-8 mt-4 border-t-2 border-brand-deep/5 flex justify-between items-center"><span className="text-gray-400 uppercase tracking-widest text-[10px] font-black">Est. Total</span><span className="text-4xl font-bold italic serif text-brand-deep leading-none">${totals.price}</span></div>
-               </div>
+                  </div>
+                )}
+                <div className="pt-8 mt-4 border-t-2 border-brand-deep/5 flex justify-between items-center">
+                  <span className="text-gray-400 uppercase tracking-widest text-[10px] font-black">{t.booking.steps.estTotal}</span>
+                  <span className="text-4xl font-bold italic serif text-brand-deep leading-none">${totals.price}</span>
+                </div>
+              </div>
             </div>
           </div>
         </div>
