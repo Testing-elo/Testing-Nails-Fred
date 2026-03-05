@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import Layout from './components/Layout';
 import Hero from './components/Hero';
@@ -6,9 +5,9 @@ import Services from './components/Services';
 import Gallery from './components/Gallery';
 import Booking from './components/Booking';
 import AvailabilityView from './components/AvailabilityView';
-import AdminAvailabilities from './components/AdminAvailabilities';
+import AdminDashboard from './components/AdminDashboard';
 
-export type View = 'home' | 'booking' | 'portfolio' | 'availabilities' | 'admin-avail';
+export type View = 'home' | 'booking' | 'portfolio' | 'availabilities' | 'admin';
 
 const App: React.FC = () => {
   const [currentView, setCurrentView] = useState<View>('home');
@@ -23,11 +22,9 @@ const App: React.FC = () => {
     window.scrollTo(0, 0);
   }, [currentView]);
 
-  // Reliable scroll lock
   useEffect(() => {
     if (showAdminModal) {
       document.body.style.overflow = 'hidden';
-      document.body.style.paddingRight = '0px'; // Prevent layout shift
     } else {
       document.body.style.overflow = '';
     }
@@ -38,7 +35,7 @@ const App: React.FC = () => {
     setTimeout(() => setToast(null), 3000);
   };
 
- const handleAdminSubmit = async (e?: React.FormEvent) => {
+  const handleAdminSubmit = async (e?: React.FormEvent) => {
     e?.preventDefault();
     try {
       const response = await fetch('/api/verify-admin', {
@@ -51,15 +48,22 @@ const App: React.FC = () => {
         setIsAdmin(true);
         setShowAdminModal(false);
         setAdminCode('');
-        showNotification("Welcome back, Fred! Admin access granted.");
+        setCurrentView('admin');
+        showNotification('Welcome back, Fred! ✦');
       } else {
-        showNotification("Incorrect code.", 'error');
+        showNotification('Incorrect code.', 'error');
         setAdminCode('');
       }
-  } catch (err) {
+    } catch (err) {
       console.error('Admin login error:', err);
-      showNotification("Something went wrong. Try again.", 'error');
+      showNotification('Something went wrong. Try again.', 'error');
     }
+  };
+
+  const handleLogout = () => {
+    setIsAdmin(false);
+    setCurrentView('home');
+    showNotification('Logged out successfully.');
   };
 
   const handleBookingBack = () => {
@@ -74,23 +78,47 @@ const App: React.FC = () => {
     setCurrentView(view);
   };
 
+  // Admin dashboard is a full-page takeover — no Layout wrapper
+  if (currentView === 'admin' && isAdmin) {
+    return (
+      <>
+        <AdminDashboard onNotify={showNotification} onLogout={handleLogout} />
+        {toast && (
+          <div className="fixed bottom-10 left-1/2 -translate-x-1/2 z-[200] animate-fade-in-up">
+            <div className={`px-8 py-4 rounded-full shadow-2xl font-black uppercase text-[10px] tracking-widest text-white flex items-center gap-3 ${toast.type === 'success' ? 'bg-brand-deep' : 'bg-red-500'}`}>
+              <span className="text-brand-pink text-lg">✦</span>
+              {toast.message}
+            </div>
+          </div>
+        )}
+        <style>{`
+          @keyframes fade-in-up {
+            from { opacity: 0; transform: translate(-50%, 20px); }
+            to { opacity: 1; transform: translate(-50%, 0); }
+          }
+          .animate-fade-in-up { animation: fade-in-up 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards; }
+        `}</style>
+      </>
+    );
+  }
+
   const renderContent = () => {
     switch (currentView) {
       case 'home':
         return (
           <>
-            <Hero 
-              onBookClick={() => navigateTo('booking')} 
+            <Hero
+              onBookClick={() => navigateTo('booking')}
               onPortfolioClick={() => navigateTo('portfolio')}
             />
             <Services />
-            <Gallery isAdmin={isAdmin} onNotify={showNotification} />
+            <Gallery isAdmin={false} onNotify={showNotification} />
           </>
         );
       case 'portfolio':
         return (
           <div className="pt-24 min-h-screen">
-            <Gallery isAdmin={isAdmin} onNotify={showNotification} />
+            <Gallery isAdmin={false} onNotify={showNotification} />
           </div>
         );
       case 'availabilities':
@@ -99,19 +127,13 @@ const App: React.FC = () => {
             <AvailabilityView onBookNow={(date, time) => navigateTo('booking', date, time)} />
           </div>
         );
-      case 'admin-avail':
-        return (
-          <div className="pt-24 min-h-screen">
-            <AdminAvailabilities onNotify={showNotification} />
-          </div>
-        );
       case 'booking':
         return (
           <div className="pt-24 min-h-screen">
-            <Booking 
+            <Booking
               initialDate={preselectedDate}
               initialTime={preselectedTime}
-              onBack={handleBookingBack} 
+              onBack={handleBookingBack}
             />
           </div>
         );
@@ -125,8 +147,8 @@ const App: React.FC = () => {
       <div className="transition-opacity duration-500">
         {renderContent()}
       </div>
-      
-      {/* Toast Notification */}
+
+      {/* Toast */}
       {toast && (
         <div className="fixed bottom-10 left-1/2 -translate-x-1/2 z-[200] animate-fade-in-up">
           <div className={`px-8 py-4 rounded-full shadow-2xl font-black uppercase text-[10px] tracking-widest text-white flex items-center gap-3 ${toast.type === 'success' ? 'bg-brand-deep' : 'bg-red-500'}`}>
@@ -147,7 +169,7 @@ const App: React.FC = () => {
               <p className="text-gray-400 text-xs font-black uppercase tracking-widest">Enter Access Code</p>
             </div>
             <form onSubmit={handleAdminSubmit} className="space-y-6">
-              <input 
+              <input
                 autoFocus
                 type="password"
                 className="w-full p-6 bg-gray-50 border-2 border-transparent focus:border-brand-deep rounded-2xl outline-none text-center text-2xl font-black tracking-[0.5em] transition-all"
@@ -156,14 +178,14 @@ const App: React.FC = () => {
                 placeholder="••••"
               />
               <div className="grid grid-cols-2 gap-4">
-                <button 
+                <button
                   type="button"
                   onClick={() => setShowAdminModal(false)}
                   className="py-4 rounded-2xl font-black uppercase text-[10px] tracking-widest text-gray-400 hover:text-brand-deep transition-all"
                 >
                   Cancel
                 </button>
-                <button 
+                <button
                   type="submit"
                   className="py-4 bg-brand-deep text-white rounded-2xl font-black uppercase text-[10px] tracking-widest hover:bg-brand-pink hover:text-brand-deep transition-all shadow-xl"
                 >
@@ -175,12 +197,14 @@ const App: React.FC = () => {
         </div>
       )}
 
-      {/* Floating Action Button for Mobile */}
-      <button 
+      {/* Mobile FAB */}
+      <button
         onClick={() => navigateTo('booking')}
         className={`fixed bottom-8 right-8 md:hidden w-16 h-16 bg-brand-deep text-white rounded-full flex items-center justify-center shadow-2xl z-40 transition-all duration-300 border-4 border-white ${currentView === 'booking' ? 'scale-0' : 'scale-100'}`}
       >
-        <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2-2v12a2 2 0 002 2z"></path></svg>
+        <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2-2v12a2 2 0 002 2z"></path>
+        </svg>
       </button>
 
       <style>{`
@@ -192,12 +216,8 @@ const App: React.FC = () => {
           from { opacity: 0; transform: translate(-50%, 20px); }
           to { opacity: 1; transform: translate(-50%, 0); }
         }
-        .animate-scale-in {
-          animation: scale-in 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
-        }
-        .animate-fade-in-up {
-          animation: fade-in-up 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
-        }
+        .animate-scale-in { animation: scale-in 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards; }
+        .animate-fade-in-up { animation: fade-in-up 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards; }
       `}</style>
     </Layout>
   );
