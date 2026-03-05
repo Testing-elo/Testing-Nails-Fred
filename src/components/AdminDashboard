@@ -159,7 +159,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNotify, onLogout }) =
       <div className="border-b border-white/5 bg-[#0d0d14]/90 backdrop-blur-xl sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <span className="text-brand-pink text-2xl">✦</span>
+            <span className="text-brand-pink text-2xl">{"✦"}</span>
             <div>
               <h1 className="text-white font-black text-sm uppercase tracking-[0.3em]">NailzByFred</h1>
               <p className="text-white/30 text-[9px] uppercase tracking-widest font-bold">Admin Dashboard</p>
@@ -206,7 +206,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNotify, onLogout }) =
                 { label: 'Total Bookings', value: stats.total, icon: '📅', color: 'from-brand-pink/20 to-transparent' },
                 { label: "Today's Appointments", value: stats.todayCount, icon: '⏰', color: 'from-purple-500/20 to-transparent' },
                 { label: 'Est. Revenue', value: `$${stats.revenue}`, icon: '💰', color: 'from-green-500/20 to-transparent' },
-                { label: 'Upcoming Available Days', value: stats.upcomingSlots, icon: '✦', color: 'from-blue-500/20 to-transparent' },
+                { label: 'Upcoming Available Days', value: stats.upcomingSlots, icon: '2726', color: 'from-blue-500/20 to-transparent' },
               ].map((s, i) => (
                 <div key={i} className={`p-6 rounded-3xl border border-white/5 bg-gradient-to-br ${s.color} bg-white/5 relative overflow-hidden`}>
                   <span className="text-2xl mb-4 block">{s.icon}</span>
@@ -221,7 +221,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNotify, onLogout }) =
               <div className="px-8 py-6 border-b border-white/5 flex items-center justify-between">
                 <h3 className="text-white font-black text-sm uppercase tracking-widest">Recent Bookings</h3>
                 <button onClick={() => setActiveTab('bookings')} className="text-brand-pink text-[9px] font-black uppercase tracking-widest hover:text-white transition-colors">
-                  View All →
+                  View All {'\u2192'}
                 </button>
               </div>
               <div className="divide-y divide-white/5">
@@ -262,8 +262,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNotify, onLogout }) =
                   {currentMonth.toLocaleDateString(undefined, { month: 'long', year: 'numeric' })}
                 </h3>
                 <div className="flex gap-3">
-                  <button onClick={() => setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1, 1))} className="p-2.5 bg-white/5 rounded-xl hover:bg-brand-pink/20 transition-all text-white/60 hover:text-white">←</button>
-                  <button onClick={() => setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 1))} className="p-2.5 bg-white/5 rounded-xl hover:bg-brand-pink/20 transition-all text-white/60 hover:text-white">→</button>
+                  <button onClick={() => setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1, 1))} className="p-2.5 bg-white/5 rounded-xl hover:bg-brand-pink/20 transition-all text-white/60 hover:text-white">{"←"}</button>
+                  <button onClick={() => setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 1))} className="p-2.5 bg-white/5 rounded-xl hover:bg-brand-pink/20 transition-all text-white/60 hover:text-white">{"→"}</button>
                 </div>
               </div>
               <div className="grid grid-cols-7 gap-2">
@@ -334,7 +334,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNotify, onLogout }) =
                               <p className="text-white/30 text-[9px] italic">{booking.service}</p>
                             </div>
                             <button onClick={() => deleteBooking(activeDate!, booking.time)}
-                              className="w-7 h-7 bg-red-500/10 text-red-400 rounded-full flex items-center justify-center opacity-0 group-hover/card:opacity-100 hover:bg-red-500 hover:text-white transition-all text-xs">✕</button>
+                              className="w-7 h-7 bg-red-500/10 text-red-400 rounded-full flex items-center justify-center opacity-0 group-hover/card:opacity-100 hover:bg-red-500 hover:text-white transition-all text-xs">{"✕"}</button>
                           </div>
                         ))}
                       </div>
@@ -393,7 +393,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNotify, onLogout }) =
                                 {isBooked && <span className="text-[8px] font-black uppercase tracking-widest text-green-400 bg-green-400/10 px-2 py-0.5 rounded-full">Booked</span>}
                               </div>
                               {!isBooked && (
-                                <button onClick={() => removeTime(activeDate, time)} className="text-red-400 hover:text-red-500 transition-colors opacity-0 group-hover:opacity-100 text-xs">✕</button>
+                                <button onClick={() => removeTime(activeDate, time)} className="text-red-400 hover:text-red-500 transition-colors opacity-0 group-hover:opacity-100 text-xs">{"✕"}</button>
                               )}
                             </div>
                           );
@@ -467,7 +467,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNotify, onLogout }) =
                       <button
                         onClick={() => deleteBooking(b.date, b.time)}
                         className="w-7 h-7 bg-red-500/10 text-red-400 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 hover:bg-red-500 hover:text-white transition-all text-xs"
-                      >✕</button>
+                      >{"✕"}</button>
                     </div>
                   </div>
                 ))}
