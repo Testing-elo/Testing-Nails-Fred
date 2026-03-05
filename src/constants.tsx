@@ -1,4 +1,3 @@
-
 import { Service, GalleryImage } from './types';
 
 export const SIZINGS: Service[] = [
@@ -38,53 +37,53 @@ export const SIZINGS: Service[] = [
     price: '65$', 
     duration: '105+ mins' 
   },
+  {
+    id: 'acrylic-toes',
+    name: 'Acrylic Toes',
+    nameFr: 'Acrylique orteils',
+    description: 'Full acrylic set for toes',
+    descriptionFr: 'Pose acrylique complète pour les orteils',
+    price: '55$',
+    duration: '60+ mins'
+  },
 ];
 
 export const ADDONS: Service[] = [
-  { 
-    id: 'ft', 
-    name: 'French tips', 
-    nameFr: 'French classique',
-    description: 'Classic or color', 
-    descriptionFr: 'Classique ou couleur',
-    price: '1$–10$', 
-    duration: '+15 mins' 
+  {
+    id: 'tier-1',
+    name: 'Tier 1 – Basic Color / French Tips',
+    nameFr: 'Tier 1 – Couleur de base / French',
+    description: 'Simple color or classic french tips',
+    descriptionFr: 'Couleur simple ou french classique',
+    price: '10$',
+    duration: '+15 mins'
   },
-  { 
-    id: 'od', 
-    name: 'Other designs', 
-    nameFr: 'Autres designs',
-    description: 'Custom artistry', 
-    descriptionFr: 'Créations personnalisées',
-    price: '5$–20$', 
-    duration: '+20 mins' 
+  {
+    id: 'tier-2',
+    name: 'Tier 2 – Light Design',
+    nameFr: 'Tier 2 – Design léger',
+    description: 'Simple nail art & light patterns',
+    descriptionFr: 'Nail art simple & motifs légers',
+    price: '15$',
+    duration: '+20 mins'
   },
-  { 
-    id: '3d', 
-    name: '3D designs', 
-    nameFr: 'Designs 3D',
-    description: 'Sculpted texture', 
-    descriptionFr: 'Texture sculptée',
-    price: '2$–5$', 
-    duration: '+10 mins' 
+  {
+    id: 'tier-3',
+    name: 'Tier 3 – Glam Design',
+    nameFr: 'Tier 3 – Design Glam',
+    description: 'Light bling & charms included',
+    descriptionFr: 'Petits bijoux & charms inclus',
+    price: '20$',
+    duration: '+30 mins'
   },
-  { 
-    id: 'cg', 
-    name: 'Charms / gems', 
-    nameFr: 'Bijoux / Gems',
-    description: 'Curated jewelry', 
-    descriptionFr: 'Bijoux sélectionnés',
-    price: '2$–5$', 
-    duration: '+5 mins' 
-  },
-  { 
-    id: 'bn', 
-    name: 'Bling nails', 
-    nameFr: 'Ongles "Bling"',
-    description: 'Ultimate luxury', 
-    descriptionFr: 'Le luxe ultime',
-    price: '3$', 
-    duration: '+10 mins' 
+  {
+    id: 'tier-4',
+    name: 'Tier 4 – Luxury Design',
+    nameFr: 'Tier 4 – Design Luxe',
+    description: 'Extra bling & extra charms',
+    descriptionFr: 'Bijoux & charms en abondance',
+    price: '25$',
+    duration: '+40 mins'
   },
   { 
     id: 'sm', 
@@ -107,4 +106,5 @@ export const ADDONS: Service[] = [
 ];
 
 export const SERVICES: Service[] = [...SIZINGS, ...ADDONS];
+
 export const GALLERY: GalleryImage[] = [];
