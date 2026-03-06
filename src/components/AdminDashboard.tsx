@@ -1,10 +1,12 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { supabase } from '../services/supabase';
 
 const PRESET_TIME_SLOTS = [
   "09:00 AM", "10:30 AM", "12:00 PM",
   "01:30 PM", "03:00 PM", "04:30 PM", "06:00 PM"
 ];
+
+const DEFAULT_CATEGORIES = ['All', 'Classic', 'Acrylic', 'Art', 'Gel', 'Luxury'];
 
 interface AdminDashboardProps {
   onNotify: (message: string, type?: 'success' | 'error') => void;
@@ -22,7 +24,14 @@ interface Booking {
   estimated_total: number;
 }
 
-type Tab = 'overview' | 'schedule' | 'bookings';
+interface PortfolioImage {
+  id: string;
+  url: string;
+  title: string;
+  category: string;
+}
+
+type Tab = 'overview' | 'schedule' | 'bookings' | 'portfolio';
 
 const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNotify, onLogout }) => {
   const [activeTab, setActiveTab] = useState<Tab>('overview');
@@ -34,6 +43,18 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNotify, onLogout }) =
   const [customTimePeriod, setCustomTimePeriod] = useState('AM');
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
+
+  // Portfolio state
+  const [portfolioImages, setPortfolioImages] = useState<PortfolioImage[]>([]);
+  const [portfolioLoading, setPortfolioLoading] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [newImage, setNewImage] = useState({ title: '', category: 'Art' });
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [activeFilter, setActiveFilter] = useState('All');
+  const [categories, setCategories] = useState<string[]>(DEFAULT_CATEGORIES);
+  const [newCatName, setNewCatName] = useState('');
+  const [showCatManager, setShowCatManager] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -55,7 +76,98 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNotify, onLogout }) =
       setLoading(false);
     };
     fetchData();
+
+    const saved = localStorage.getItem('portfolio_categories');
+    if (saved) {
+      try {
+        const parsed: string[] = JSON.parse(saved);
+        setCategories(parsed);
+        const firstReal = parsed.find(c => c !== 'All');
+        if (firstReal) setNewImage(prev => ({ ...prev, category: firstReal }));
+      } catch {}
+    }
   }, []);
+
+  useEffect(() => {
+    if (activeTab === 'portfolio') {
+      const fetchPortfolio = async () => {
+        setPortfolioLoading(true);
+        const { data } = await supabase.from('portfolio').select('*').order('created_at', { ascending: false });
+        if (data) {
+          setPortfolioImages(data.map((row: any) => ({
+            id: row.id.toString(),
+            url: row.url,
+            title: row.title,
+            category: row.category,
+          })));
+        }
+        setPortfolioLoading(false);
+      };
+      fetchPortfolio();
+    }
+  }, [activeTab]);
+
+  const saveCategories = (cats: string[]) => {
+    setCategories(cats);
+    localStorage.setItem('portfolio_categories', JSON.stringify(cats));
+  };
+
+  const handleAddCategory = () => {
+    const trimmed = newCatName.trim();
+    if (!trimmed || categories.includes(trimmed)) return;
+    const updated = [...categories, trimmed];
+    saveCategories(updated);
+    setNewCatName('');
+    setNewImage(prev => ({ ...prev, category: trimmed }));
+    onNotify(`Category "${trimmed}" added`);
+  };
+
+  const handleRemoveCategory = (cat: string) => {
+    if (cat === 'All') return;
+    const updated = categories.filter(c => c !== cat);
+    saveCategories(updated);
+    if (activeFilter === cat) setActiveFilter('All');
+    onNotify(`Category "${cat}" removed`);
+  };
+
+  const handleUpload = async () => {
+    if (!selectedFile || !newImage.title) {
+      onNotify('Please enter a title and select a file', 'error');
+      return;
+    }
+    setUploading(true);
+    const fileName = `${Date.now()}-${selectedFile.name}`;
+    const { error: uploadError } = await supabase.storage.from('portfolio').upload(fileName, selectedFile);
+    if (uploadError) { onNotify('Error uploading image', 'error'); setUploading(false); return; }
+    const { data: urlData } = supabase.storage.from('portfolio').getPublicUrl(fileName);
+    const { data, error } = await supabase.from('portfolio').insert({
+      url: urlData.publicUrl,
+      title: newImage.title,
+      category: newImage.category,
+    }).select().single();
+    if (error) { onNotify('Error saving image', 'error'); setUploading(false); return; }
+    setPortfolioImages(prev => [{ id: data.id.toString(), url: urlData.publicUrl, title: data.title, category: data.category }, ...prev]);
+    setNewImage({ title: '', category: categories.find(c => c !== 'All') || 'Art' });
+    setSelectedFile(null);
+    if (fileInputRef.current) fileInputRef.current.value = '';
+    setUploading(false);
+    onNotify('Portfolio image added!');
+  };
+
+  const handleDeleteImage = async (id: string, url: string) => {
+    if (!window.confirm('Delete this image?')) return;
+    const fileName = url.split('/').pop();
+    if (fileName) await supabase.storage.from('portfolio').remove([fileName]);
+    const { error } = await supabase.from('portfolio').delete().eq('id', id);
+    if (error) { onNotify('Error deleting image', 'error'); return; }
+    setPortfolioImages(prev => prev.filter(img => img.id !== id));
+    onNotify('Image removed');
+  };
+
+  const filteredImages = useMemo(() => {
+    if (activeFilter === 'All') return portfolioImages;
+    return portfolioImages.filter(img => img.category === activeFilter);
+  }, [portfolioImages, activeFilter]);
 
   const stats = useMemo(() => {
     const today = new Date().toDateString();
@@ -190,7 +302,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNotify, onLogout }) =
       <div className="max-w-7xl mx-auto px-6 py-10">
         {/* Tabs */}
         <div className="flex gap-2 mb-10 bg-white/5 p-1.5 rounded-2xl w-fit">
-          {(['overview', 'schedule', 'bookings'] as Tab[]).map(tab => (
+          {(['overview', 'schedule', 'bookings', 'portfolio'] as Tab[]).map(tab => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
@@ -551,6 +663,154 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNotify, onLogout }) =
             </div>
             <p className="text-white/20 text-[9px] font-black uppercase tracking-widest">
               {filteredBookings.length} booking{filteredBookings.length !== 1 ? 's' : ''} shown
+            </p>
+          </div>
+        )}
+
+        {/* Portfolio Tab */}
+        {activeTab === 'portfolio' && (
+          <div className="space-y-8">
+            {/* Upload Panel */}
+            <div className="bg-white/5 border border-white/5 rounded-3xl p-8">
+              <h3 className="text-white font-black text-sm uppercase tracking-widest mb-6">Add New Image</h3>
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
+                <div>
+                  <label className="block text-[9px] font-black uppercase tracking-widest text-white/30 mb-2">Title</label>
+                  <input
+                    type="text"
+                    placeholder="Glow Set"
+                    className="w-full p-4 bg-white/5 border border-white/5 rounded-xl text-xs font-bold text-white outline-none focus:border-brand-pink transition-all placeholder:text-white/20"
+                    value={newImage.title}
+                    onChange={e => setNewImage({ ...newImage, title: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <label className="block text-[9px] font-black uppercase tracking-widest text-white/30 mb-2">Category</label>
+                  <select
+                    className="w-full p-4 bg-white/5 border border-white/5 rounded-xl text-xs font-black text-white/70 outline-none focus:border-brand-pink transition-all cursor-pointer"
+                    value={newImage.category}
+                    onChange={e => setNewImage({ ...newImage, category: e.target.value })}
+                  >
+                    {categories.filter(c => c !== 'All').map(c => <option key={c} value={c}>{c}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-[9px] font-black uppercase tracking-widest text-white/30 mb-2">Image File</label>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    ref={fileInputRef}
+                    className="w-full p-3.5 bg-white/5 border border-white/5 rounded-xl text-xs font-bold text-white/50 outline-none cursor-pointer"
+                    onChange={e => setSelectedFile(e.target.files?.[0] || null)}
+                    disabled={uploading}
+                  />
+                </div>
+                <button
+                  onClick={handleUpload}
+                  disabled={uploading || !selectedFile || !newImage.title}
+                  className="w-full bg-brand-pink text-brand-deep p-4 rounded-xl text-[10px] font-black uppercase tracking-widest hover:opacity-90 transition-all disabled:opacity-30 disabled:cursor-not-allowed"
+                >
+                  {uploading ? 'Uploading...' : '+ Upload'}
+                </button>
+              </div>
+
+              {/* Category Manager */}
+              <div className="mt-8 pt-6 border-t border-white/5">
+                <button
+                  onClick={() => setShowCatManager(v => !v)}
+                  className="flex items-center gap-2 text-[9px] font-black uppercase tracking-widest text-white/30 hover:text-white/60 transition-colors"
+                >
+                  <span className={`transition-transform text-[8px] ${showCatManager ? 'rotate-90' : ''}`}>▶</span>
+                  Manage Categories
+                </button>
+                {showCatManager && (
+                  <div className="mt-5 space-y-4">
+                    <div className="flex flex-wrap gap-2">
+                      {categories.filter(c => c !== 'All').map(cat => (
+                        <div key={cat} className="flex items-center gap-2 bg-white/5 border border-white/10 rounded-xl px-3 py-2">
+                          <span className="text-xs font-bold text-white/60">{cat}</span>
+                          <button
+                            onClick={() => handleRemoveCategory(cat)}
+                            className="w-4 h-4 bg-red-500/20 text-red-400 rounded-full flex items-center justify-center text-[9px] hover:bg-red-500 hover:text-white transition-all font-black"
+                          >✕</button>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="flex gap-3 items-center">
+                      <input
+                        type="text"
+                        value={newCatName}
+                        onChange={e => setNewCatName(e.target.value)}
+                        onKeyDown={e => e.key === 'Enter' && handleAddCategory()}
+                        placeholder="New category name"
+                        className="p-3 bg-white/5 border border-white/5 rounded-xl text-xs font-bold text-white outline-none focus:border-brand-pink transition-all w-48 placeholder:text-white/20"
+                      />
+                      <button
+                        onClick={handleAddCategory}
+                        disabled={!newCatName.trim()}
+                        className="px-5 py-3 bg-brand-pink/20 text-brand-pink rounded-xl font-black uppercase text-[9px] tracking-widest hover:bg-brand-pink hover:text-brand-deep transition-all disabled:opacity-30 disabled:cursor-not-allowed"
+                      >
+                        + Add
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Filter Bar */}
+            <div className="flex flex-wrap gap-2">
+              {categories.map(cat => (
+                <button
+                  key={cat}
+                  onClick={() => setActiveFilter(cat)}
+                  className={
+                    'px-5 py-2.5 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all border ' +
+                    (activeFilter === cat
+                      ? 'bg-brand-pink text-brand-deep border-brand-pink'
+                      : 'bg-white/5 text-white/30 border-white/5 hover:border-brand-pink/30 hover:text-white/60')
+                  }
+                >
+                  {cat}
+                </button>
+              ))}
+            </div>
+
+            {/* Image Grid */}
+            {portfolioLoading ? (
+              <div className="p-20 text-center text-white/20 italic text-xs">Loading...</div>
+            ) : filteredImages.length === 0 ? (
+              <div className="p-20 text-center border-2 border-dashed border-white/5 rounded-3xl text-white/15 italic text-sm">
+                No images yet. Upload one above!
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                {filteredImages.map(img => (
+                  <div key={img.id} className="group relative bg-white/5 rounded-2xl overflow-hidden border border-white/5">
+                    <div className="aspect-square overflow-hidden">
+                      <img
+                        src={img.url}
+                        alt={img.title}
+                        loading="lazy"
+                        className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                      />
+                    </div>
+                    <div className="p-4">
+                      <p className="text-white font-bold text-xs truncate">{img.title}</p>
+                      <span className="text-[8px] font-black uppercase tracking-widest text-brand-pink">{img.category}</span>
+                    </div>
+                    <button
+                      onClick={() => handleDeleteImage(img.id, img.url)}
+                      className="absolute top-3 right-3 w-8 h-8 bg-red-500/80 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all hover:bg-red-500 text-xs font-black"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+            <p className="text-white/20 text-[9px] font-black uppercase tracking-widest">
+              {filteredImages.length} image{filteredImages.length !== 1 ? 's' : ''} shown
             </p>
           </div>
         )}
