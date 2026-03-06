@@ -283,7 +283,6 @@ const Booking: React.FC<BookingProps> = ({ onBack, initialDate, initialTime }) =
                         <div>
                           <h4 className="font-black uppercase tracking-widest text-xs text-brand-deep mb-1">{language === 'fr' ? tier.nameFr : tier.name}</h4>
                           <p className="text-[10px] text-gray-400 italic font-medium mt-1">{language === 'fr' ? tier.descriptionFr : tier.description}</p>
-                          <p className="text-[9px] text-gray-300 font-black uppercase tracking-widest mt-2">{tier.duration}</p>
                         </div>
                         <span className="font-black text-brand-deep text-xl ml-4">{tier.price}</span>
                       </div>
@@ -309,7 +308,6 @@ const Booking: React.FC<BookingProps> = ({ onBack, initialDate, initialTime }) =
                         <div>
                           <h4 className="font-bold text-brand-deep text-sm md:text-base mb-1">{language === 'fr' ? addon.nameFr : addon.name}</h4>
                           <p className="text-[10px] text-gray-400 uppercase tracking-widest font-black">{addon.price}</p>
-                          <p className="text-[9px] text-gray-300 font-black uppercase tracking-widest mt-1">{addon.duration}</p>
                         </div>
                         <div className={`w-10 h-10 rounded-full flex items-center justify-center transition-all ml-4 flex-shrink-0 ${selected ? 'bg-brand-deep text-white shadow-lg' : 'bg-white text-gray-200 border border-gray-100'}`}>
                           {selected ? '✓' : '+'}
