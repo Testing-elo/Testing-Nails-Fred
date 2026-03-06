@@ -280,7 +280,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onNotify, onLogout }) =
       <div className="border-b border-white/5 bg-[#0d0d14]/90 backdrop-blur-xl sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <span className="text-brand-pink text-2xl font-black">NxF</span>
             <div>
               <h1 className="text-white font-black text-sm uppercase tracking-[0.3em]">NailzByFred</h1>
               <p className="text-white/30 text-[9px] uppercase tracking-widest font-bold">Admin Dashboard</p>
