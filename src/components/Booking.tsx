@@ -1,6 +1,6 @@
 import { supabase } from '../services/supabase';
 import React, { useState, useMemo, useEffect } from 'react';
-import { SIZINGS, ADDONS } from '../constants';
+import { SIZINGS, TIERS, ADDONS } from '../constants';
 import { useLanguage } from '../LanguageContext';
 
 interface BookingProps {
@@ -8,13 +8,13 @@ interface BookingProps {
   initialDate?: Date | null;
   initialTime?: string | null;
 }
+
 const Booking: React.FC<BookingProps> = ({ onBack, initialDate, initialTime }) => {
   const [inspirationImage, setInspirationImage] = useState<string | null>(null);
   const { language, t } = useLanguage();
   const [step, setStep] = useState(1);
   const [showSuccess, setShowSuccess] = useState(false);
-  
-  // Real Availabilities from Admin
+
   const [availabilities, setAvailabilities] = useState<{ dates: string[], times: Record<string, string[]> }>({ dates: [], times: {} });
   const [bookings, setBookings] = useState<{ date: string, time: string }[]>([]);
 
@@ -30,15 +30,12 @@ const Booking: React.FC<BookingProps> = ({ onBack, initialDate, initialTime }) =
         });
         setAvailabilities({ dates, times });
       }
-
       const { data: bookingData } = await supabase.from('bookings').select('date, time');
       if (bookingData) setBookings(bookingData);
     };
-
     fetchData();
   }, []);
 
-  // Calendar State
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<Date | null>(initialDate || null);
   const [selectedTime, setSelectedTime] = useState<string | null>(initialTime || null);
@@ -51,14 +48,15 @@ const Booking: React.FC<BookingProps> = ({ onBack, initialDate, initialTime }) =
     if (initialTime) setSelectedTime(initialTime);
   }, [initialDate, initialTime]);
 
-  const [formState, setFormState] = useState({ 
-    name: '', 
-    contactMethod: '', 
+  const [formState, setFormState] = useState({
+    name: '',
+    contactMethod: '',
     contactDetail: '',
-    lengthId: SIZINGS[0].id 
+    lengthId: SIZINGS[0].id,
+    tierId: '' as string,
   });
-  
-  const [selectedAddons, setSelectedAddons] = useState<Record<string, number>>({});
+
+  const [selectedAddons, setSelectedAddons] = useState<Record<string, boolean>>({});
 
   const calendarDays = useMemo(() => {
     const year = currentMonth.getFullYear();
@@ -71,7 +69,6 @@ const Booking: React.FC<BookingProps> = ({ onBack, initialDate, initialTime }) =
     return days;
   }, [currentMonth]);
 
-  // Localized day headers
   const dayHeaders = language === 'fr'
     ? ['D', 'L', 'M', 'M', 'J', 'V', 'S']
     : ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
@@ -87,42 +84,52 @@ const Booking: React.FC<BookingProps> = ({ onBack, initialDate, initialTime }) =
 
   const totals = useMemo(() => {
     const base = SIZINGS.find(s => s.id === formState.lengthId);
+    const tier = TIERS.find(t => t.id === formState.tierId);
     const basePrice = parseInt(base?.price.replace('$', '') || '0');
+    const tierPrice = tier ? parseInt(tier.price.replace('$', '') || '0') : 0;
+
     let addonTotal = 0;
     const selectedItemsList: { name: string, price: string }[] = [];
 
-    (Object.entries(selectedAddons) as [string, number][]).forEach(([id, qty]) => {
-      if (qty > 0) {
+    if (tier) {
+      selectedItemsList.push({
+        name: language === 'fr' ? tier.nameFr! : tier.name,
+        price: tier.price
+      });
+    }
+
+    Object.entries(selectedAddons).forEach(([id, selected]) => {
+      if (selected) {
         const addon = ADDONS.find(a => a.id === id);
         if (addon) {
-          const priceStr = addon.price.split('–')[0].replace('$', '');
-          const price = parseInt(priceStr) || 0;
-          addonTotal += price * qty;
-          selectedItemsList.push({ 
-            name: `${qty > 1 ? qty + 'x ' : ''}${language === 'fr' ? addon.nameFr : addon.name}`, 
-            price: `$${price * qty}` 
+          const price = parseInt(addon.price.replace('$', '') || '0');
+          addonTotal += price;
+          selectedItemsList.push({
+            name: language === 'fr' ? addon.nameFr! : addon.name,
+            price: addon.price
           });
         }
       }
     });
 
-    return { 
-      price: basePrice + addonTotal, 
-      baseName: base ? (language === 'fr' ? base.nameFr : base.name) : '',
+    return {
+      price: basePrice + tierPrice + addonTotal,
+      baseName: base ? (language === 'fr' ? base.nameFr! : base.name) : '',
       items: selectedItemsList
     };
-  }, [formState.lengthId, selectedAddons, language]);
+  }, [formState.lengthId, formState.tierId, selectedAddons, language]);
 
   const isStepValid = () => {
     if (step === 1) return !!formState.lengthId;
-    if (step === 2) return true;
-    if (step === 3) return !!selectedDate && !!selectedTime;
-    if (step === 4) {
+    if (step === 2) return !!formState.tierId;
+    if (step === 3) return true;
+    if (step === 4) return !!selectedDate && !!selectedTime;
+    if (step === 5) {
       const isNameValid = formState.name.trim() !== '';
       const isMethodValid = formState.contactMethod !== '';
       const isDetailValid = formState.contactDetail.trim() !== '';
       if (formState.contactMethod === 'phone') {
-         return isNameValid && isMethodValid && formState.contactDetail.length === 14;
+        return isNameValid && isMethodValid && formState.contactDetail.length === 14;
       }
       return isNameValid && isMethodValid && isDetailValid;
     }
@@ -172,14 +179,13 @@ const Booking: React.FC<BookingProps> = ({ onBack, initialDate, initialTime }) =
       estimated_total: totals.price
     });
 
-    const newBooking = { date: selectedDate.toDateString(), time: selectedTime };
-    setBookings([...bookings, newBooking]);
+    setBookings([...bookings, { date: selectedDate.toDateString(), time: selectedTime }]);
     setShowSuccess(true);
   };
 
   const nextStep = () => {
     if (!isStepValid()) return;
-    if (step === 4) {
+    if (step === 5) {
       handleFinalSubmit();
     } else {
       setStep(s => s + 1);
@@ -187,20 +193,6 @@ const Booking: React.FC<BookingProps> = ({ onBack, initialDate, initialTime }) =
   };
 
   const prevStep = () => setStep(s => Math.max(s - 1, 1));
-
-  const toggleAddon = (id: string) => {
-    setSelectedAddons(prev => ({ ...prev, [id]: prev[id] ? 0 : 1 }));
-  };
-
-  const updateAddonQty = (id: string, delta: number) => {
-    setSelectedAddons(prev => {
-      const current = prev[id] || 0;
-      const next = current + delta;
-      if (next < 0) return { ...prev, [id]: 0 };
-      if (next > 20) return { ...prev, [id]: 20 };
-      return { ...prev, [id]: next };
-    });
-  };
 
   const formatPhoneNumber = (value: string) => {
     const phoneNumber = value.replace(/\D/g, '').slice(0, 10);
@@ -215,6 +207,8 @@ const Booking: React.FC<BookingProps> = ({ onBack, initialDate, initialTime }) =
     if (formState.contactMethod === 'phone') value = formatPhoneNumber(value);
     setFormState({ ...formState, contactDetail: value });
   };
+
+  const TOTAL_STEPS = 5;
 
   if (showSuccess) return (
     <div className="max-w-4xl mx-auto px-4 py-20 text-center animate-fade-in">
@@ -232,17 +226,18 @@ const Booking: React.FC<BookingProps> = ({ onBack, initialDate, initialTime }) =
   return (
     <div className="min-h-screen bg-[#FFC0CB]/5 pb-20">
       <div className="max-w-7xl mx-auto px-4">
+        {/* Progress */}
         <div className="mb-16 md:mb-20 text-center">
           <button onClick={onBack} className="inline-flex items-center text-[10px] font-black uppercase tracking-[0.4em] text-gray-400 hover:text-brand-deep transition-all mb-12 group">
             <span className="mr-2 group-hover:-translate-x-1 transition-transform">←</span> {t.booking.exitBooking}
           </button>
-          <div className="flex items-center justify-center space-x-2 md:space-x-8">
-            {[1, 2, 3, 4].map(num => (
+          <div className="flex items-center justify-center space-x-2 md:space-x-6">
+            {[1, 2, 3, 4, 5].map(num => (
               <React.Fragment key={num}>
-                <div className={`w-10 h-10 md:w-14 md:h-14 rounded-full flex items-center justify-center font-black text-[10px] md:text-sm transition-all shadow-xl ${step >= num ? 'bg-brand-deep text-white' : 'bg-white text-gray-300 border-2 border-gray-50'}`}>
+                <div className={`w-10 h-10 md:w-12 md:h-12 rounded-full flex items-center justify-center font-black text-[10px] md:text-xs transition-all shadow-xl ${step >= num ? 'bg-brand-deep text-white' : 'bg-white text-gray-300 border-2 border-gray-50'}`}>
                   {num}
                 </div>
-                {num < 4 && <div className={`w-4 md:w-16 h-1 rounded-full ${step > num ? 'bg-brand-deep' : 'bg-gray-100'}`}></div>}
+                {num < TOTAL_STEPS && <div className={`w-4 md:w-12 h-1 rounded-full ${step > num ? 'bg-brand-deep' : 'bg-gray-100'}`}></div>}
               </React.Fragment>
             ))}
           </div>
@@ -251,15 +246,16 @@ const Booking: React.FC<BookingProps> = ({ onBack, initialDate, initialTime }) =
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 md:gap-16">
           <div className="lg:col-span-8 space-y-12">
 
-            {/* Step 1 — Length */}
+            {/* Step 1 — Service / Length */}
             {step === 1 && (
               <div className="bg-white p-8 md:p-16 rounded-[3rem] md:rounded-[4rem] shadow-2xl animate-fade-in border-4 border-white">
-                <span className="text-brand-pink font-black text-[10px] uppercase tracking-[0.5em] mb-4 block">{t.booking.steps.step01}</span>
+                <span className="text-brand-pink font-black text-[10px] uppercase tracking-[0.5em] mb-4 block">Step 01</span>
                 <h2 className="text-3xl md:text-5xl font-bold serif mb-10 md:mb-12 text-brand-deep">{t.booking.steps.selectLength}</h2>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-8">
                   {SIZINGS.map((s) => (
-                    <button key={s.id} onClick={() => setFormState({...formState, lengthId: s.id})} className={`p-8 md:p-10 text-left rounded-[2.5rem] md:rounded-[3rem] border-4 transition-all relative overflow-hidden group ${formState.lengthId === s.id ? 'border-brand-deep bg-white shadow-2xl scale-[1.02]' : 'border-gray-50 bg-gray-50/30 hover:border-brand-pink/50'}`}>
-                      <div className="flex justify-between items-start mb-4 relative z-10">
+                    <button key={s.id} onClick={() => setFormState({ ...formState, lengthId: s.id })}
+                      className={`p-8 md:p-10 text-left rounded-[2.5rem] md:rounded-[3rem] border-4 transition-all relative overflow-hidden ${formState.lengthId === s.id ? 'border-brand-deep bg-white shadow-2xl scale-[1.02]' : 'border-gray-50 bg-gray-50/30 hover:border-brand-pink/50'}`}>
+                      <div className="flex justify-between items-start mb-4">
                         <div>
                           <h4 className="font-black uppercase tracking-widest text-xs text-brand-deep mb-1">{language === 'fr' ? s.nameFr : s.name}</h4>
                           <p className="text-[10px] text-gray-400 italic font-medium">{language === 'fr' ? s.descriptionFr : s.description}</p>
@@ -273,42 +269,62 @@ const Booking: React.FC<BookingProps> = ({ onBack, initialDate, initialTime }) =
               </div>
             )}
 
-            {/* Step 2 — Add-ons */}
+            {/* Step 2 — Design Tier */}
             {step === 2 && (
               <div className="bg-white p-8 md:p-16 rounded-[3rem] md:rounded-[4rem] shadow-2xl animate-fade-in border-4 border-white">
-                <span className="text-brand-pink font-black text-[10px] uppercase tracking-[0.5em] mb-4 block">{t.booking.steps.step02}</span>
-                <h2 className="text-3xl md:text-5xl font-bold serif mb-10 md:mb-12 text-brand-deep">{t.booking.steps.enhanceSet}</h2>
+                <span className="text-brand-pink font-black text-[10px] uppercase tracking-[0.5em] mb-4 block">Step 02</span>
+                <h2 className="text-3xl md:text-5xl font-bold serif mb-4 text-brand-deep">Choose Your Design Tier</h2>
+                <p className="text-gray-400 text-xs font-medium mb-10 uppercase tracking-widest italic">Select the complexity of your nail design</p>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {TIERS.map((tier) => (
+                    <button key={tier.id} onClick={() => setFormState({ ...formState, tierId: tier.id })}
+                      className={`p-8 text-left rounded-[2.5rem] border-4 transition-all relative overflow-hidden ${formState.tierId === tier.id ? 'border-brand-deep bg-white shadow-2xl scale-[1.02]' : 'border-gray-50 bg-gray-50/30 hover:border-brand-pink/50'}`}>
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <h4 className="font-black uppercase tracking-widest text-xs text-brand-deep mb-1">{language === 'fr' ? tier.nameFr : tier.name}</h4>
+                          <p className="text-[10px] text-gray-400 italic font-medium mt-1">{language === 'fr' ? tier.descriptionFr : tier.description}</p>
+                          <p className="text-[9px] text-gray-300 font-black uppercase tracking-widest mt-2">{tier.duration}</p>
+                        </div>
+                        <span className="font-black text-brand-deep text-xl ml-4">{tier.price}</span>
+                      </div>
+                      {formState.tierId === tier.id && <div className="absolute top-0 right-0 p-4 text-brand-pink">✦</div>}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Step 3 — Add-ons */}
+            {step === 3 && (
+              <div className="bg-white p-8 md:p-16 rounded-[3rem] md:rounded-[4rem] shadow-2xl animate-fade-in border-4 border-white">
+                <span className="text-brand-pink font-black text-[10px] uppercase tracking-[0.5em] mb-4 block">Step 03</span>
+                <h2 className="text-3xl md:text-5xl font-bold serif mb-4 text-brand-deep">{t.booking.steps.enhanceSet}</h2>
                 <p className="text-gray-400 text-xs font-medium mb-10 uppercase tracking-widest italic">{t.booking.steps.enhanceSubtitle}</p>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 md:gap-6">
                   {ADDONS.map((addon) => {
-                    const qty = selectedAddons[addon.id] || 0;
-                    const isMulti = ['ft', 'od', 'bn', 'cg', '3d'].includes(addon.id);
+                    const selected = selectedAddons[addon.id] || false;
                     return (
-                      <div key={addon.id} className={`p-6 md:p-8 rounded-[2rem] border-2 transition-all flex items-center justify-between ${qty > 0 ? 'bg-brand-pink/5 border-brand-pink shadow-md' : 'bg-gray-50 border-transparent hover:border-gray-100'}`}>
-                        <div className="flex-grow">
+                      <button key={addon.id} onClick={() => setSelectedAddons(prev => ({ ...prev, [addon.id]: !prev[addon.id] }))}
+                        className={`p-6 md:p-8 rounded-[2rem] border-2 transition-all flex items-center justify-between text-left ${selected ? 'bg-brand-pink/5 border-brand-pink shadow-md' : 'bg-gray-50 border-transparent hover:border-gray-100'}`}>
+                        <div>
                           <h4 className="font-bold text-brand-deep text-sm md:text-base mb-1">{language === 'fr' ? addon.nameFr : addon.name}</h4>
                           <p className="text-[10px] text-gray-400 uppercase tracking-widest font-black">{addon.price}</p>
+                          <p className="text-[9px] text-gray-300 font-black uppercase tracking-widest mt-1">{addon.duration}</p>
                         </div>
-                        {isMulti ? (
-                          <div className="flex items-center bg-white rounded-full shadow-sm border border-gray-100 overflow-hidden ml-4">
-                            <button onClick={(e) => { e.stopPropagation(); updateAddonQty(addon.id, -1); }} className="w-10 h-10 flex items-center justify-center text-brand-deep hover:bg-brand-pink/20 transition-colors font-bold text-lg">-</button>
-                            <span className="w-8 text-center text-xs font-black">{qty}</span>
-                            <button onClick={(e) => { e.stopPropagation(); updateAddonQty(addon.id, 1); }} className="w-10 h-10 flex items-center justify-center text-brand-deep hover:bg-brand-pink/20 transition-colors font-bold text-lg">+</button>
-                          </div>
-                        ) : (
-                          <button onClick={() => toggleAddon(addon.id)} className={`w-10 h-10 rounded-full flex items-center justify-center transition-all ${qty > 0 ? 'bg-brand-deep text-white shadow-lg' : 'bg-white text-gray-200 border border-gray-100'}`}>{qty > 0 ? '✓' : '+'}</button>
-                        )}
-                      </div>
+                        <div className={`w-10 h-10 rounded-full flex items-center justify-center transition-all ml-4 flex-shrink-0 ${selected ? 'bg-brand-deep text-white shadow-lg' : 'bg-white text-gray-200 border border-gray-100'}`}>
+                          {selected ? '✓' : '+'}
+                        </div>
+                      </button>
                     );
                   })}
                 </div>
               </div>
             )}
 
-            {/* Step 3 — Calendar */}
-            {step === 3 && (
+            {/* Step 4 — Calendar */}
+            {step === 4 && (
               <div className="bg-white p-8 md:p-16 rounded-[3rem] md:rounded-[4rem] shadow-2xl animate-fade-in border-4 border-white">
-                <span className="text-brand-pink font-black text-[10px] uppercase tracking-[0.5em] mb-4 block">{t.booking.steps.step03}</span>
+                <span className="text-brand-pink font-black text-[10px] uppercase tracking-[0.5em] mb-4 block">Step 04</span>
                 <div className="flex justify-between items-center mb-10 md:mb-12">
                   <h2 className="text-3xl md:text-5xl font-bold serif text-brand-deep">{t.booking.steps.pickSlot}</h2>
                   <div className="flex gap-4">
@@ -323,20 +339,16 @@ const Booking: React.FC<BookingProps> = ({ onBack, initialDate, initialTime }) =
                     const dateStr = date.toDateString();
                     const isAvailable = availabilities.dates.includes(dateStr);
                     const isSelected = selectedDate?.toDateString() === dateStr;
-                    const isPast = date < new Date(new Date().setHours(0,0,0,0));
-                    
+                    const isPast = date < new Date(new Date().setHours(0, 0, 0, 0));
                     return (
-                      <button 
-                        key={idx} 
-                        disabled={!isAvailable || isPast} 
+                      <button key={idx} disabled={!isAvailable || isPast}
                         onClick={() => { setSelectedDate(date); setSelectedTime(null); }}
                         className={`aspect-square flex flex-col items-center justify-center rounded-2xl text-[10px] md:text-xs font-black transition-all relative ${
-                          isSelected ? 'bg-brand-pink text-brand-deep shadow-lg scale-110 z-10' : 
+                          isSelected ? 'bg-brand-pink text-brand-deep shadow-lg scale-110 z-10' :
                           isPast ? 'bg-gray-100/50 text-gray-300 opacity-40 cursor-not-allowed' :
-                          !isAvailable ? 'bg-gray-50/50 text-gray-300 opacity-60 cursor-not-allowed' : 
+                          !isAvailable ? 'bg-gray-50/50 text-gray-300 opacity-60 cursor-not-allowed' :
                           'bg-gray-50 text-brand-deep hover:bg-brand-pink/20'
-                        }`}
-                      >
+                        }`}>
                         <span className={isPast ? 'line-through' : ''}>{date.getDate()}</span>
                         {isPast && <span className="absolute bottom-1 text-[6px] uppercase tracking-tighter opacity-50">{t.booking.steps.past}</span>}
                         {!isAvailable && !isPast && <span className="absolute bottom-1 text-[5px] uppercase tracking-widest opacity-40">{t.booking.steps.na}</span>}
@@ -349,18 +361,12 @@ const Booking: React.FC<BookingProps> = ({ onBack, initialDate, initialTime }) =
                     {timeSlotsForDate.length > 0 ? (
                       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 md:gap-4">
                         {timeSlotsForDate.map(slot => (
-                          <button 
-                            key={slot.time} 
-                            disabled={slot.isBooked}
-                            onClick={() => setSelectedTime(slot.time)} 
+                          <button key={slot.time} disabled={slot.isBooked} onClick={() => setSelectedTime(slot.time)}
                             className={`py-4 rounded-2xl text-[10px] font-black transition-all border-2 relative overflow-hidden ${
-                              slot.isBooked 
-                              ? 'bg-gray-50 text-gray-300 cursor-not-allowed opacity-60' 
-                              : selectedTime === slot.time 
-                                ? 'bg-brand-deep text-white border-brand-deep shadow-xl scale-105' 
-                                : 'bg-gray-50 text-brand-deep border-transparent hover:border-brand-pink'
-                            }`}
-                          >
+                              slot.isBooked ? 'bg-gray-50 text-gray-300 cursor-not-allowed opacity-60' :
+                              selectedTime === slot.time ? 'bg-brand-deep text-white border-brand-deep shadow-xl scale-105' :
+                              'bg-gray-50 text-brand-deep border-transparent hover:border-brand-pink'
+                            }`}>
                             <span className={slot.isBooked ? 'line-through' : ''}>{slot.time}</span>
                             {slot.isBooked && <span className="absolute inset-0 flex items-center justify-center bg-gray-100/30 text-[8px] uppercase font-black text-gray-400">{t.booking.steps.booked}</span>}
                           </button>
@@ -374,22 +380,23 @@ const Booking: React.FC<BookingProps> = ({ onBack, initialDate, initialTime }) =
               </div>
             )}
 
-            {/* Step 4 — Details */}
-            {step === 4 && (
+            {/* Step 5 — Details */}
+            {step === 5 && (
               <div className="bg-white p-8 md:p-16 rounded-[3rem] md:rounded-[4rem] shadow-2xl border-4 border-white animate-fade-in">
-                <span className="text-brand-pink font-black text-[10px] uppercase tracking-[0.5em] mb-4 block">{t.booking.steps.step04}</span>
+                <span className="text-brand-pink font-black text-[10px] uppercase tracking-[0.5em] mb-4 block">Step 05</span>
                 <h2 className="text-3xl md:text-5xl font-bold serif mb-10 md:mb-12 text-brand-deep">{t.booking.steps.yourDetails}</h2>
                 <div className="space-y-10">
                   <div className="space-y-4">
                     <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 block ml-6">{t.booking.steps.fullName}</label>
-                    <input type="text" className="w-full p-8 bg-gray-50 border-2 border-transparent rounded-[2.5rem] outline-none focus:border-brand-deep focus:bg-white text-lg font-medium transition-all" value={formState.name} onChange={(e) => setFormState({...formState, name: e.target.value})} placeholder="e.g. Jane Doe" />
+                    <input type="text" className="w-full p-8 bg-gray-50 border-2 border-transparent rounded-[2.5rem] outline-none focus:border-brand-deep focus:bg-white text-lg font-medium transition-all" value={formState.name} onChange={(e) => setFormState({ ...formState, name: e.target.value })} placeholder="e.g. Jane Doe" />
                   </div>
-                  
+
                   <div className="space-y-4">
                     <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 block ml-6">{t.booking.steps.howContact}</label>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       {(['email', 'phone'] as const).map(method => (
-                        <button key={method} onClick={() => setFormState({...formState, contactMethod: method, contactDetail: ''})} className={`py-6 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all border-2 ${formState.contactMethod === method ? 'bg-brand-deep text-white border-brand-deep shadow-lg' : 'bg-white text-gray-400 border-gray-50 hover:border-brand-pink'}`}>
+                        <button key={method} onClick={() => setFormState({ ...formState, contactMethod: method, contactDetail: '' })}
+                          className={`py-6 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all border-2 ${formState.contactMethod === method ? 'bg-brand-deep text-white border-brand-deep shadow-lg' : 'bg-white text-gray-400 border-gray-50 hover:border-brand-pink'}`}>
                           {method === 'email' ? t.booking.steps.emailMethod : t.booking.steps.phoneMethod}
                         </button>
                       ))}
@@ -401,7 +408,9 @@ const Booking: React.FC<BookingProps> = ({ onBack, initialDate, initialTime }) =
                       <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 block ml-6">
                         {t.booking.steps.yourContactDetail.replace('{method}', formState.contactMethod === 'phone' ? t.booking.steps.phoneMethod : t.booking.steps.emailMethod)}
                       </label>
-                      <input type="text" className="w-full p-8 bg-gray-50 border-2 border-transparent rounded-[2.5rem] outline-none focus:border-brand-deep focus:bg-white text-lg font-medium transition-all" placeholder={formState.contactMethod === 'phone' ? '(514)-123-4567' : t.booking.steps.emailPlaceholder} value={formState.contactDetail} onChange={handleContactDetailChange} />
+                      <input type="text" className="w-full p-8 bg-gray-50 border-2 border-transparent rounded-[2.5rem] outline-none focus:border-brand-deep focus:bg-white text-lg font-medium transition-all"
+                        placeholder={formState.contactMethod === 'phone' ? '(514)-123-4567' : t.booking.steps.emailPlaceholder}
+                        value={formState.contactDetail} onChange={handleContactDetailChange} />
                     </div>
                   )}
 
@@ -409,12 +418,8 @@ const Booking: React.FC<BookingProps> = ({ onBack, initialDate, initialTime }) =
                     <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 block ml-6">
                       {t.booking.steps.inspirationPhoto} <span className="text-brand-pink">({t.booking.steps.optional})</span>
                     </label>
-                    <input
-                      type="file"
-                      accept="image/*"
-                      onChange={handleInspirationUpload}
-                      className="w-full p-8 bg-gray-50 border-2 border-transparent rounded-[2.5rem] outline-none focus:border-brand-deep focus:bg-white text-sm font-medium transition-all cursor-pointer"
-                    />
+                    <input type="file" accept="image/*" onChange={handleInspirationUpload}
+                      className="w-full p-8 bg-gray-50 border-2 border-transparent rounded-[2.5rem] outline-none focus:border-brand-deep focus:bg-white text-sm font-medium transition-all cursor-pointer" />
                     {inspirationImage && (
                       <div className="relative w-32 h-32 rounded-2xl overflow-hidden border-4 border-brand-pink shadow-lg">
                         <img src={inspirationImage} alt="Inspiration" className="w-full h-full object-cover" />
@@ -433,9 +438,9 @@ const Booking: React.FC<BookingProps> = ({ onBack, initialDate, initialTime }) =
                   <span className="mr-3">←</span> {t.booking.steps.back}
                 </button>
               ) : <div />}
-              
-              <button onClick={nextStep} disabled={!isStepValid()} className={`px-14 py-6 bg-brand-deep text-white rounded-full font-black uppercase tracking-[0.4em] text-[10px] shadow-2xl transition-all ${!isStepValid() ? 'opacity-20 cursor-not-allowed translate-y-2' : 'hover:scale-105 active:scale-95'}`}>
-                {step === 4 ? `${t.booking.steps.sendRequest} ✦` : t.booking.steps.nextStep}
+              <button onClick={nextStep} disabled={!isStepValid()}
+                className={`px-14 py-6 bg-brand-deep text-white rounded-full font-black uppercase tracking-[0.4em] text-[10px] shadow-2xl transition-all ${!isStepValid() ? 'opacity-20 cursor-not-allowed translate-y-2' : 'hover:scale-105 active:scale-95'}`}>
+                {step === 5 ? `${t.booking.steps.sendRequest} ✦` : t.booking.steps.nextStep}
               </button>
             </div>
           </div>
