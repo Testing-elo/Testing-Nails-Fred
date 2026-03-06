@@ -48,7 +48,7 @@ export const SIZINGS: Service[] = [
   },
 ];
 
-export const ADDONS: Service[] = [
+export const TIERS: Service[] = [
   {
     id: 'tier-1',
     name: 'Tier 1 – Basic Color / French Tips',
@@ -85,6 +85,9 @@ export const ADDONS: Service[] = [
     price: '25$',
     duration: '+40 mins'
   },
+];
+
+export const ADDONS: Service[] = [
   { 
     id: 'sm', 
     name: 'Simple manicure', 
@@ -105,6 +108,5 @@ export const ADDONS: Service[] = [
   },
 ];
 
-export const SERVICES: Service[] = [...SIZINGS, ...ADDONS];
-
+export const SERVICES: Service[] = [...SIZINGS, ...TIERS, ...ADDONS];
 export const GALLERY: GalleryImage[] = [];
